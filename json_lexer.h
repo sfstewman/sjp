@@ -98,6 +98,11 @@ void json_lexer_more(struct json_lexer *l, char *data, size_t n);
 // token type is not JSON_NONE, the lexer expects a partial token
 int json_lexer_token(struct json_lexer *l, struct json_token *tok);
 
+// Closes the lexer state.  If the lexer is not at a position where it
+// can be stopped (ie: it's waiting on the close " of a string), the
+// lexer returns JSON_INVALID.
+int json_lexer_close(struct json_lexer *l);
+
 #undef MODULE_NAME
 
 #endif /* JSON_LEXER_H */

@@ -682,3 +682,13 @@ int json_lexer_token(struct json_lexer *l, struct json_token *tok)
     return JSON_INVALID;
   }
 } 
+
+int json_lexer_close(struct json_lexer *l)
+{
+  if (l->state != JSON_LST_VALUE) {
+    l->state = JSON_LST_VALUE;
+    return JSON_INVALID;
+  }
+
+  return JSON_OK;
+}
