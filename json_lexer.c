@@ -50,7 +50,7 @@ void json_lexer_init(struct json_lexer *l)
   l->prev_lbeg = 0;
 
   memset(l->buf, 0, sizeof l->buf);
-  l->state = JSON_LEX_VALUE;
+  l->state = JSON_LST_VALUE;
 }
 
 // Sets the lexer data, resets the buffer offset.  The lexer may modify
@@ -78,25 +78,25 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   off0 = l->off;
 
   // TODO: restart state
-  ch = (l->state == JSON_LEX_KEYWORD) ? l->buf[0] : jl_getc(l);
+  ch = (l->state == JSON_LST_KEYWORD) ? l->buf[0] : jl_getc(l);
   switch (ch) {
     case 't':
       kw = "rue";
-      tok->type = JSON_TRUE;
+      tok->type = JSON_TOK_TRUE;
       break;
 
     case 'f':
       kw = "alse";
-      tok->type = JSON_FALSE;
+      tok->type = JSON_TOK_FALSE;
       break;
 
     case 'n':
       kw = "ull";
-      tok->type = JSON_NULL;
+      tok->type = JSON_TOK_NULL;
       break;
 
     default:
-      assert(l->state != JSON_LEX_KEYWORD);
+      assert(l->state != JSON_LST_KEYWORD);
       jl_ungetc(l,ch);
       goto invalid;
   }
@@ -104,7 +104,7 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   l->buf[0] = ch;
   b = &l->buf[1];
 
-  if (l->state == JSON_LEX_KEYWORD) {
+  if (l->state == JSON_LST_KEYWORD) {
     for (b = &l->buf[1]; *b != '\0'; b++, kw++) {
       assert(*kw == *b);
       continue;
@@ -132,7 +132,7 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   }
 
   // on restart, return internal buffer
-  if (l->state == JSON_LEX_KEYWORD) {
+  if (l->state == JSON_LST_KEYWORD) {
     tok->value = &l->buf[0];
     tok->n = b - l->buf;
   } else {
@@ -149,20 +149,20 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   //
   // Need to revisit this, though.
 
-  l->state = JSON_LEX_VALUE;
+  l->state = JSON_LST_VALUE;
   return JSON_OK;
 
 partial:
   *b = 0;
-  l->state = JSON_LEX_KEYWORD;
-  tok->type = JSON_NONE;
+  l->state = JSON_LST_KEYWORD;
+  tok->type = JSON_TOK_NONE;
   tok->value = l->buf;
   tok->n = b - l->buf;
   return JSON_MORE;
 
 invalid:
-  l->state = JSON_LEX_VALUE;
-  tok->type = JSON_NONE;
+  l->state = JSON_LST_VALUE;
+  tok->type = JSON_TOK_NONE;
   tok->value = &l->data[off0];
   tok->n = l->sz - off0;
   return JSON_INVALID;
@@ -220,20 +220,20 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
 
   off0 = l->off;
   outInd = off0;
-  tok->type = JSON_STRING;
+  tok->type = JSON_TOK_STRING;
 
   switch (l->state) {
-    case JSON_LEX_STR_ESC1: goto read_esc;
-    case JSON_LEX_STR_ESC2: goto read_udig1; 
-    case JSON_LEX_STR_ESC3: goto read_udig2; 
-    case JSON_LEX_STR_ESC4: goto read_udig3; 
-    case JSON_LEX_STR_ESC5: goto read_udig4;
+    case JSON_LST_STR_ESC1: goto read_esc;
+    case JSON_LST_STR_ESC2: goto read_udig1; 
+    case JSON_LST_STR_ESC3: goto read_udig2; 
+    case JSON_LST_STR_ESC4: goto read_udig3; 
+    case JSON_LST_STR_ESC5: goto read_udig4;
 
-    case JSON_LEX_VALUE:
-      l->state = JSON_LEX_STR;
+    case JSON_LST_VALUE:
+      l->state = JSON_LST_STR;
       /* fallthrough */
 
-    case JSON_LEX_STR:
+    case JSON_LST_STR:
       goto fast_path;
 
     default:
@@ -241,14 +241,20 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
       abort();
   }
 
-fast_path:
   // fast path: no escapes, scan for next '"'
+fast_path:
   while (ch = jl_getc(l), ch != EOF) {
     if (ch == '"') {
-        l->state = JSON_LEX_VALUE;
+        l->state = JSON_LST_VALUE;
         tok->value = &l->data[off0];
         tok->n = l->off - off0 - 1; // last -1 is to omit the trailing "
         return JSON_OK;
+    }
+
+    // control characters aren't allowed.  RFC 7159 defines them
+    // as U+0000 to U+001F
+    if (ch < 0x1f) {
+      return JSON_INVALID;
     }
 
     if (ch == '\\') {
@@ -278,10 +284,16 @@ fast_path:
     int hexdig;
 
     if (ch == '"') {
-      l->state = JSON_LEX_VALUE;
+      l->state = JSON_LST_VALUE;
       tok->value = &l->data[off0];
       tok->n = outInd - off0;
       return JSON_OK;
+    }
+
+    // control characters aren't allowed.  RFC 7159 defines them
+    // as U+0000 to U+001F
+    if (ch < 0x1f) {
+      return JSON_INVALID;
     }
 
     if (ch != '\\') {
@@ -294,7 +306,7 @@ read_esc:
     ch = jl_getc(l);
     switch (ch) {
       case EOF:
-        l->state = JSON_LEX_STR_ESC1;
+        l->state = JSON_LST_STR_ESC1;
         goto partial;
 
       case '"': case '\\': case '/':
@@ -330,7 +342,7 @@ read_esc:
 
 read_udig1:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LEX_STR_ESC2;
+          l->state = JSON_LST_STR_ESC2;
           goto partial;
         }
 
@@ -343,7 +355,7 @@ read_udig1:
 
 read_udig2:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LEX_STR_ESC3;
+          l->state = JSON_LST_STR_ESC3;
           goto partial;
         }
 
@@ -356,7 +368,7 @@ read_udig2:
 
 read_udig3:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LEX_STR_ESC4;
+          l->state = JSON_LST_STR_ESC4;
           goto partial;
         }
 
@@ -369,7 +381,7 @@ read_udig3:
 
 read_udig4:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LEX_STR_ESC5;
+          l->state = JSON_LST_STR_ESC5;
           goto partial;
         }
 
@@ -398,7 +410,7 @@ read_udig4:
             assert(outInd == off0);
             tok->value = &l->buf[0];
             tok->n = nb;
-            l->state = JSON_LEX_STR;
+            l->state = JSON_LST_STR;
             return JSON_PARTIAL;
           }
 
@@ -424,26 +436,30 @@ static int parse_num(struct json_lexer *l, struct json_token *tok)
   int ch;
 
   off0 = l->off;
-  tok->type = JSON_NUMBER;
+  tok->type = JSON_TOK_NUMBER;
   tok->value = &l->data[off0];
 
   ch = jl_getc(l);
   switch (l->state) {
-    case JSON_LEX_VALUE: break;
-    case JSON_LEX_NUM_NEG: goto st_neg;
-    case JSON_LEX_NUM_DIG0: goto st_dig0;
-    case JSON_LEX_NUM_DIG:  goto st_dig;
-    case JSON_LEX_NUM_DOT:  goto st_dot;
-    case JSON_LEX_NUM_DIGF: goto st_digf;
-    case JSON_LEX_NUM_EXP:  goto st_exp;
-    case JSON_LEX_NUM_ESGN: goto st_esign;
-    case JSON_LEX_NUM_EDIG: goto st_edig;
+    case JSON_LST_VALUE:
+      break;
 
-    default: return JSON_INVALID; // should never reach here!
+    // restarts after reading:
+    case JSON_LST_NUM_NEG:  goto st_neg;   // leading '-'
+    case JSON_LST_NUM_DIG0: goto st_dig0;  // leading '0'
+    case JSON_LST_NUM_DIG:  goto st_dig;   // leading '1' .. '9'
+    case JSON_LST_NUM_DOT:  goto st_dot;   // decimal dot '.'
+    case JSON_LST_NUM_DIGF: goto st_digf;  // '0' .. '9' after '.'
+    case JSON_LST_NUM_EXP:  goto st_exp;   // 'e' or 'E'
+    case JSON_LST_NUM_ESGN: goto st_esign; // '+' or '-' after e/E
+    case JSON_LST_NUM_EDIG: goto st_edig;  // exponent digit
+
+    default:
+      return JSON_INVALID; // should never reach here!
   }
 
   if (ch == '-') {
-    l->state = JSON_LEX_NUM_NEG;
+    l->state = JSON_LST_NUM_NEG;
     ch = jl_getc(l);
   }
 
@@ -461,7 +477,7 @@ st_neg:
   }
 
 st_dig:
-  l->state = JSON_LEX_NUM_DIG;
+  l->state = JSON_LST_NUM_DIG;
   for(;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -483,7 +499,7 @@ st_dig:
   }
 
 st_dig0:
-  l->state = JSON_LEX_NUM_DIG0;
+  l->state = JSON_LST_NUM_DIG0;
   ch = jl_getc(l);
   if (ch == EOF) {
     goto more;
@@ -507,7 +523,7 @@ st_dig0:
   goto finish;
 
 st_dot:
-  l->state = JSON_LEX_NUM_DOT;
+  l->state = JSON_LST_NUM_DOT;
   ch = jl_getc(l);
   if (ch == EOF) {
     goto more;
@@ -519,7 +535,7 @@ st_dot:
   }
 
 st_digf:
-  l->state = JSON_LEX_NUM_DIGF;
+  l->state = JSON_LST_NUM_DIGF;
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -537,11 +553,11 @@ st_digf:
   }
 
 st_exp:
-  l->state = JSON_LEX_NUM_EXP;
+  l->state = JSON_LST_NUM_EXP;
   ch = jl_getc(l);
 
   if (ch == '-' || ch == '+') {
-    l->state = JSON_LEX_NUM_ESGN;
+    l->state = JSON_LST_NUM_ESGN;
     ch = jl_getc(l);
   }
 
@@ -555,7 +571,7 @@ st_esign:
   }
 
 st_edig:
-  l->state = JSON_LEX_NUM_EDIG;
+  l->state = JSON_LST_NUM_EDIG;
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -573,7 +589,7 @@ more:
   return JSON_MORE;
 
 finish:
-  l->state = JSON_LEX_VALUE;
+  l->state = JSON_LST_VALUE;
   tok->n = l->off - off0;
   return JSON_OK;
 }
@@ -581,7 +597,7 @@ finish:
 static int parse_value(struct json_lexer *l, struct json_token *tok)
 {
   // skip whitespace
-  tok->type = JSON_NONE;
+  tok->type = JSON_TOK_NONE;
   tok->value = NULL;
 
   int ch;
@@ -634,36 +650,35 @@ static int parse_value(struct json_lexer *l, struct json_token *tok)
 // Returns the next token or partial token
 //
 // If the return is a partial token, the buffer is exhausted.  If the
-// token type is not JSON_NONE, the lexer expects a partial token
+// token type is not JSON_TOK_NONE, the lexer expects a partial token
 int json_lexer_token(struct json_lexer *l, struct json_token *tok)
 {
   switch (l->state) {
-  case JSON_LEX_VALUE:
+  case JSON_LST_VALUE:
     return parse_value(l,tok);
 
-  case JSON_LEX_KEYWORD:
+  case JSON_LST_KEYWORD:
     return parse_kw(l,tok);
 
-  case JSON_LEX_STR:
-  case JSON_LEX_STR_ESC1:
-  case JSON_LEX_STR_ESC2:
-  case JSON_LEX_STR_ESC3:
-  case JSON_LEX_STR_ESC4:
-  case JSON_LEX_STR_ESC5:
+  case JSON_LST_STR:
+  case JSON_LST_STR_ESC1:
+  case JSON_LST_STR_ESC2:
+  case JSON_LST_STR_ESC3:
+  case JSON_LST_STR_ESC4:
+  case JSON_LST_STR_ESC5:
     return parse_str(l,tok);
 
-  case JSON_LEX_NUM_NEG:
-  case JSON_LEX_NUM_DIG0:
-  case JSON_LEX_NUM_DIG:
-  case JSON_LEX_NUM_DOT:
-  case JSON_LEX_NUM_DIGF:
-  case JSON_LEX_NUM_EXP:
-  case JSON_LEX_NUM_ESGN:
-  case JSON_LEX_NUM_EDIG:
+  case JSON_LST_NUM_NEG:
+  case JSON_LST_NUM_DIG0:
+  case JSON_LST_NUM_DIG:
+  case JSON_LST_NUM_DOT:
+  case JSON_LST_NUM_DIGF:
+  case JSON_LST_NUM_EXP:
+  case JSON_LST_NUM_ESGN:
+  case JSON_LST_NUM_EDIG:
     return JSON_INVALID;
 
   default:
     return JSON_INVALID;
   }
-}
-
+} 

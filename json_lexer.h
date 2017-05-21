@@ -11,28 +11,28 @@
 // state is not kept for arrays and objects because their delimiters are
 // single characters
 enum JSON_LEX_STATE {
-  JSON_LEX_VALUE,    // waiting on json value
+  JSON_LST_VALUE,    // waiting on json value
 
-  JSON_LEX_KEYWORD,  // parsing keywords (true,false,null)
+  JSON_LST_KEYWORD,  // parsing keywords (true,false,null)
 
-  JSON_LEX_STR,
-  JSON_LEX_STR_ESC1, // read '\' but not the escape character
+  JSON_LST_STR,
+  JSON_LST_STR_ESC1, // read '\' but not the escape character
 
   // these escape allows restart inside of a \uXYZW escape
-  JSON_LEX_STR_ESC2, // waiting for X
-  JSON_LEX_STR_ESC3, // waiting for Y
-  JSON_LEX_STR_ESC4, // waiting for Z
-  JSON_LEX_STR_ESC5, // waiting for W
+  JSON_LST_STR_ESC2, // waiting for X
+  JSON_LST_STR_ESC3, // waiting for Y
+  JSON_LST_STR_ESC4, // waiting for Z
+  JSON_LST_STR_ESC5, // waiting for W
 
   // number states
-  JSON_LEX_NUM_NEG,  // read leading '-' sign
-  JSON_LEX_NUM_DIG0, // read leading zero digit
-  JSON_LEX_NUM_DIG,  // read digit for the integer part
-  JSON_LEX_NUM_DOT,  // read '.'
-  JSON_LEX_NUM_DIGF, // read digit for the fractional part
-  JSON_LEX_NUM_EXP,  // read exponent char ('e' or 'E')
-  JSON_LEX_NUM_ESGN, // read exponent sign
-  JSON_LEX_NUM_EDIG, // read exponent digit
+  JSON_LST_NUM_NEG,  // read leading '-' sign
+  JSON_LST_NUM_DIG0, // read leading zero digit
+  JSON_LST_NUM_DIG,  // read digit for the integer part
+  JSON_LST_NUM_DOT,  // read '.'
+  JSON_LST_NUM_DIGF, // read digit for the fractional part
+  JSON_LST_NUM_EXP,  // read exponent char ('e' or 'E')
+  JSON_LST_NUM_ESGN, // read exponent sign
+  JSON_LST_NUM_EDIG, // read exponent digit
 };
 
 // max supported chars in a number
@@ -54,7 +54,7 @@ struct json_lexer {
   enum JSON_LEX_STATE state;
 };
 
-enum JSON_LEX_RESULT {
+enum JSON_RESULT {
   JSON_INVALID = -1,
   JSON_OK      =  0,
   JSON_MORE    =  1,   // return partial token, needs more input
@@ -62,19 +62,19 @@ enum JSON_LEX_RESULT {
 };
 
 enum JSON_TOKEN {
-  JSON_NONE,    // no input
+  JSON_TOK_NONE,    // no input
 
-  JSON_NULL,
-  JSON_TRUE,
-  JSON_FALSE,
-  JSON_STRING,
-  JSON_NUMBER,
-  JSON_OCURLY   = '{',
-  JSON_CCURLY   = '}',
-  JSON_OBRACKET = '[',
-  JSON_CBRACKET = ']',
-  JSON_COMMA    = ',',
-  JSON_COLON    = ':',
+  JSON_TOK_NULL,
+  JSON_TOK_TRUE,
+  JSON_TOK_FALSE,
+  JSON_TOK_STRING,
+  JSON_TOK_NUMBER,
+  JSON_TOK_OCURLY   = '{',
+  JSON_TOK_CCURLY   = '}',
+  JSON_TOK_OBRACKET = '[',
+  JSON_TOK_CBRACKET = ']',
+  JSON_TOK_COMMA    = ',',
+  JSON_TOK_COLON    = ':',
 };
 
 struct json_token {

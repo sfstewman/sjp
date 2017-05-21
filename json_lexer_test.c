@@ -3,13 +3,19 @@
 #include <stdio.h>
 #include <string.h>
 
+#if TEST_LOG_LEVEL
+#  define LOG(fmt, ...) printf(fmt, __VA_ARG__)
+#else
+#  define LOG(fmt, ...) 
+#endif
+
 struct lexer_output {
-  enum JSON_LEX_RESULT ret;
+  enum JSON_RESULT ret;
   enum JSON_TOKEN type;
   const char *value;
 };
 
-const char *ret2name(enum JSON_LEX_RESULT ret)
+const char *ret2name(enum JSON_RESULT ret)
 {
   switch (ret) {
     case JSON_INVALID:
@@ -32,18 +38,18 @@ const char *ret2name(enum JSON_LEX_RESULT ret)
 const char *tok2name(enum JSON_TOKEN type)
 {
   switch (type) {
-    case JSON_NONE:     return "NONE";
-    case JSON_NULL:     return "NULL";
-    case JSON_TRUE:     return "TRUE";
-    case JSON_FALSE:    return "FALSE";
-    case JSON_STRING:   return "STR";
-    case JSON_NUMBER:   return "NUM";
-    case JSON_OCURLY:   return "{";
-    case JSON_CCURLY:   return "}";
-    case JSON_OBRACKET: return "[";
-    case JSON_CBRACKET: return "]"; 
-    case JSON_COMMA:    return ",";
-    case JSON_COLON:    return ":";
+    case JSON_TOK_NONE:     return "NONE";
+    case JSON_TOK_NULL:     return "NULL";
+    case JSON_TOK_TRUE:     return "TRUE";
+    case JSON_TOK_FALSE:    return "FALSE";
+    case JSON_TOK_STRING:   return "STR";
+    case JSON_TOK_NUMBER:   return "NUM";
+    case JSON_TOK_OCURLY:   return "{";
+    case JSON_TOK_CCURLY:   return "}";
+    case JSON_TOK_OBRACKET: return "[";
+    case JSON_TOK_CBRACKET: return "]"; 
+    case JSON_TOK_COMMA:    return ",";
+    case JSON_TOK_COLON:    return ":";
     default:            return "UNKNOWN";
   }
 }
@@ -51,29 +57,29 @@ const char *tok2name(enum JSON_TOKEN type)
 const char *st2name(enum JSON_LEX_STATE st)
 {
   switch (st) {
-    case JSON_LEX_VALUE:    return "VALUE";
-    case JSON_LEX_KEYWORD:  return "KEYWORD";
-    case JSON_LEX_STR:      return "STR";
-    case JSON_LEX_STR_ESC1: return "STR_ESC1";
-    case JSON_LEX_STR_ESC2: return "STR_ESC2";
-    case JSON_LEX_STR_ESC3: return "STR_ESC3";
-    case JSON_LEX_STR_ESC4: return "STR_ESC4";
-    case JSON_LEX_STR_ESC5: return "STR_ESC5";
-    case JSON_LEX_NUM_NEG:  return "NUM_NEG";
-    case JSON_LEX_NUM_DIG0: return "NUM_DIG0";
-    case JSON_LEX_NUM_DIG:  return "NUM_DIG";
-    case JSON_LEX_NUM_DOT:  return "NUM_DOT";
-    case JSON_LEX_NUM_DIGF: return "NUM_DIGF";
-    case JSON_LEX_NUM_EXP:  return "NUM_EXP";
-    case JSON_LEX_NUM_ESGN: return "NUM_ESGN";
-    case JSON_LEX_NUM_EDIG: return "NUM_EDIG";
+    case JSON_LST_VALUE:    return "VALUE";
+    case JSON_LST_KEYWORD:  return "KEYWORD";
+    case JSON_LST_STR:      return "STR";
+    case JSON_LST_STR_ESC1: return "STR_ESC1";
+    case JSON_LST_STR_ESC2: return "STR_ESC2";
+    case JSON_LST_STR_ESC3: return "STR_ESC3";
+    case JSON_LST_STR_ESC4: return "STR_ESC4";
+    case JSON_LST_STR_ESC5: return "STR_ESC5";
+    case JSON_LST_NUM_NEG:  return "NUM_NEG";
+    case JSON_LST_NUM_DIG0: return "NUM_DIG0";
+    case JSON_LST_NUM_DIG:  return "NUM_DIG";
+    case JSON_LST_NUM_DOT:  return "NUM_DOT";
+    case JSON_LST_NUM_DIGF: return "NUM_DIGF";
+    case JSON_LST_NUM_EXP:  return "NUM_EXP";
+    case JSON_LST_NUM_ESGN: return "NUM_ESGN";
+    case JSON_LST_NUM_EDIG: return "NUM_EDIG";
     default: return "UNK";
   }
 }
 
 static int is_sentinel(struct lexer_output *out)
 {
-  return out->ret == JSON_OK && out->type == JSON_NONE && out->value == NULL;
+  return out->ret == JSON_OK && out->type == JSON_TOK_NONE && out->value == NULL;
 }
 
 static int test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer_output *outputs)
@@ -88,18 +94,19 @@ static int test_inputs(struct json_lexer *lex, const char *inputs[], struct lexe
   more=1;
 
   while(1) {
-    enum JSON_LEX_RESULT ret;
+    enum JSON_RESULT ret;
     struct json_token tok = {0};
     static char buf[1024];
     size_t n;
 
-    printf("[[ i=%d, j=%d | %d %s ]]\n",
+    LOG("[[ i=%d, j=%d | %d %s ]]\n",
         i,j, lex->state, st2name(lex->state));
 
     if (is_sentinel(&outputs[j])) {
       if (inputs[i] != NULL) {
-        printf("expected outputs finished, but there are still more inputs\n");
-        printf("current input %d: %s\n", i, inputs[i]);
+        printf("expected outputs finished, but there are still more inputs:\n"
+            "current input %d: %s\n",
+            i, inputs[i]);
         return -1;
       }
 
@@ -108,14 +115,14 @@ static int test_inputs(struct json_lexer *lex, const char *inputs[], struct lexe
 
     if (more) {
       if (inputs[i] == NULL) {
-        printf("expected input finished, but there are still more outputs\n");
-        printf("current output %d: %d %d %s\n",
+        printf("expected input finished, but there are still more outputs:\n"
+            "current output %d: %d %d %s\n",
             j, outputs[i].ret, outputs[i].type, outputs[i].value);
         return -1;
       }
 
       snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
-      printf("[MORE] %s\n", inbuf);
+      LOG("[MORE] %s\n", inbuf);
       json_lexer_more(lex, inbuf, strlen(inbuf));
       i++;
     }
@@ -125,11 +132,11 @@ static int test_inputs(struct json_lexer *lex, const char *inputs[], struct lexe
     n = tok.n < sizeof buf ? tok.n : sizeof buf-1;
     memset(buf, 0, sizeof buf);
     if (n > 0) {
-      printf("[VAL ] %zu chars in value\n", n);
+      LOG("[VAL ] %zu chars in value\n", n);
       memcpy(buf, tok.value, n);
     }
 
-    printf("[TOK ] %3d %3d %8s %8s | %s\n",
+    LOG("[TOK ] %3d %3d %8s %8s | %s\n",
         ret, tok.type,
         ret2name(ret), tok2name(tok.type),
         buf);
@@ -175,17 +182,17 @@ void test_simple_array(void)
 
   struct lexer_output outputs[] = {
     { JSON_OK, '['        , "["     },
-    { JSON_OK, JSON_TRUE  , "true"  },
+    { JSON_OK, JSON_TOK_TRUE  , "true"  },
     { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_FALSE , "false" },
+    { JSON_OK, JSON_TOK_FALSE , "false" },
     { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_NULL  , "null"  },
+    { JSON_OK, JSON_TOK_NULL  , "null"  },
     { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_STRING, "foo"   },
+    { JSON_OK, JSON_TOK_STRING, "foo"   },
     { JSON_OK, ']'        , "]"     },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -209,24 +216,24 @@ void test_simple_object(void)
   struct lexer_output outputs[] = {
     { JSON_OK, '{'        , "{"     },
 
-    { JSON_OK, JSON_STRING, "foo"   },
+    { JSON_OK, JSON_TOK_STRING, "foo"   },
     { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_TRUE  , "true"  },
+    { JSON_OK, JSON_TOK_TRUE  , "true"  },
     { JSON_OK, ','        , ","     },
 
-    { JSON_OK, JSON_STRING, "bar"   },
+    { JSON_OK, JSON_TOK_STRING, "bar"   },
     { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_STRING, "baz"   },
+    { JSON_OK, JSON_TOK_STRING, "baz"   },
     { JSON_OK, ','        , ","     },
 
-    { JSON_OK, JSON_STRING, "quux"  },
+    { JSON_OK, JSON_TOK_STRING, "quux"  },
     { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_NULL  , "null"  },
+    { JSON_OK, JSON_TOK_NULL  , "null"  },
     { JSON_OK, '}'        , "}"     },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -252,22 +259,22 @@ void test_string_with_escapes(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, JSON_STRING, "this string \"has\" double quote escapes" },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_OK, JSON_TOK_STRING, "this string \"has\" double quote escapes" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_STRING, "this string has \\ some escape c\bsequences / combinations" },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_OK, JSON_TOK_STRING, "this string has \\ some escape c\bsequences / combinations" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_STRING, "this string tests form-feed\fand carriage-return \r\nand newline" },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_OK, JSON_TOK_STRING, "this string tests form-feed\fand carriage-return \r\nand newline" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_STRING, "this string tests \ttab" },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_OK, JSON_TOK_STRING, "this string tests \ttab" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E" },
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_OK, JSON_TOK_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -306,47 +313,47 @@ void test_simple_restarts(void)
   struct lexer_output outputs[] = {
     { JSON_OK, '[', "[" },
 
-    { JSON_MORE, JSON_NONE, "tr" },
-    { JSON_OK, JSON_TRUE, "true" },
+    { JSON_MORE, JSON_TOK_NONE, "tr" },
+    { JSON_OK, JSON_TOK_TRUE, "true" },
 
     { JSON_OK, ',', "," },
 
-    { JSON_MORE, JSON_NONE, "n" },
-    { JSON_OK, JSON_NULL, "null" },
+    { JSON_MORE, JSON_TOK_NONE, "n" },
+    { JSON_OK, JSON_TOK_NULL, "null" },
 
-    { JSON_MORE, JSON_NONE, "" },
-
-    { JSON_OK, ',', "," },
-
-    { JSON_MORE, JSON_NONE, "fals" },
-    { JSON_OK, JSON_FALSE, "false" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
     { JSON_OK, ',', "," },
 
-    { JSON_MORE, JSON_STRING, "some" },
-    { JSON_OK, JSON_STRING, " string" },
+    { JSON_MORE, JSON_TOK_NONE, "fals" },
+    { JSON_OK, JSON_TOK_FALSE, "false" },
 
     { JSON_OK, ',', "," },
 
-    { JSON_MORE, JSON_NONE, "" },
-
-    { JSON_MORE, JSON_NONE, "tr" },
-    { JSON_MORE, JSON_NONE, "tru" },
-    { JSON_OK, JSON_TRUE, "true" },
+    { JSON_MORE, JSON_TOK_STRING, "some" },
+    { JSON_OK, JSON_TOK_STRING, " string" },
 
     { JSON_OK, ',', "," },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "some " },
-    { JSON_MORE, JSON_STRING, "other " },
-    { JSON_OK, JSON_STRING, "string" },
+    { JSON_MORE, JSON_TOK_NONE, "tr" },
+    { JSON_MORE, JSON_TOK_NONE, "tru" },
+    { JSON_OK, JSON_TOK_TRUE, "true" },
+
+    { JSON_OK, ',', "," },
+
+    { JSON_MORE, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "some " },
+    { JSON_MORE, JSON_TOK_STRING, "other " },
+    { JSON_OK, JSON_TOK_STRING, "string" },
 
     { JSON_OK, ']', "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -403,61 +410,61 @@ void test_string_with_restarts_and_escapes(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_MORE, JSON_STRING, "this set of strings " },
-    { JSON_OK, JSON_STRING, "\"break\" the escapes" },
+    { JSON_MORE, JSON_TOK_STRING, "this set of strings " },
+    { JSON_OK, JSON_TOK_STRING, "\"break\" the escapes" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "the breaks " },
-    { JSON_MORE, JSON_STRING, "\nare sometimes for longer " },
-    { JSON_OK, JSON_STRING, "\\u sequences: " },
+    { JSON_MORE, JSON_TOK_STRING, "the breaks " },
+    { JSON_MORE, JSON_TOK_STRING, "\nare sometimes for longer " },
+    { JSON_OK, JSON_TOK_STRING, "\\u sequences: " },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "like " },
-    { JSON_MORE, JSON_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_STRING, "\u00fc and " },
-    { JSON_PARTIAL, JSON_STRING, "\u00fc" },
-    { JSON_OK, JSON_STRING, "" },
+    { JSON_MORE, JSON_TOK_STRING, "like " },
+    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u00fc" },
+    { JSON_OK, JSON_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "and " },
-    { JSON_MORE, JSON_STRING, "\u2318 and " },
-    { JSON_MORE, JSON_STRING, "\u2318 and " },
-    { JSON_MORE, JSON_STRING, "\u2318 and " },
-    { JSON_PARTIAL, JSON_STRING, "\u2318" },
-    { JSON_MORE, JSON_STRING, " and " },
-    { JSON_PARTIAL, JSON_STRING, "\u2318" },
-    { JSON_OK, JSON_STRING, "" },
+    { JSON_MORE, JSON_TOK_STRING, "and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u2318" },
+    { JSON_MORE, JSON_TOK_STRING, " and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u2318" },
+    { JSON_OK, JSON_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "and " },
-    { JSON_MORE, JSON_STRING, "\u65E5 and " },
-    { JSON_MORE, JSON_STRING, "\u65E5 and " },
-    { JSON_MORE, JSON_STRING, "\u65E5 and " },
-    { JSON_PARTIAL, JSON_STRING, "\u65E5" },
-    { JSON_MORE, JSON_STRING, " and " },
-    { JSON_PARTIAL, JSON_STRING, "\u65E5" },
-    { JSON_OK, JSON_STRING, "" },
+    { JSON_MORE, JSON_TOK_STRING, "and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u65E5" },
+    { JSON_MORE, JSON_TOK_STRING, " and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u65E5" },
+    { JSON_OK, JSON_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_STRING, "and " },
-    { JSON_MORE, JSON_STRING, "\u8A9E and " },
-    { JSON_MORE, JSON_STRING, "\u8A9E and " },
-    { JSON_MORE, JSON_STRING, "\u8A9E and " },
-    { JSON_PARTIAL, JSON_STRING, "\u8A9E" },
-    { JSON_MORE, JSON_STRING, " and " },
-    { JSON_PARTIAL, JSON_STRING, "\u8A9E" },
-    { JSON_OK, JSON_STRING, "" },
+    { JSON_MORE, JSON_TOK_STRING, "and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
+    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u8A9E" },
+    { JSON_MORE, JSON_TOK_STRING, " and " },
+    { JSON_PARTIAL, JSON_TOK_STRING, "\u8A9E" },
+    { JSON_OK, JSON_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -480,20 +487,20 @@ void test_numbers(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, JSON_NUMBER  , "3" },
-    { JSON_OK, JSON_NUMBER  , "57" },
-    { JSON_OK, JSON_NUMBER  , "0.451" },
-    { JSON_OK, JSON_NUMBER  , "10.2343" },
-    { JSON_OK, JSON_NUMBER  , "-3.4" },
-    { JSON_OK, JSON_NUMBER  , "-0.3" },
+    { JSON_OK, JSON_TOK_NUMBER  , "3" },
+    { JSON_OK, JSON_TOK_NUMBER  , "57" },
+    { JSON_OK, JSON_TOK_NUMBER  , "0.451" },
+    { JSON_OK, JSON_TOK_NUMBER  , "10.2343" },
+    { JSON_OK, JSON_TOK_NUMBER  , "-3.4" },
+    { JSON_OK, JSON_TOK_NUMBER  , "-0.3" },
 
-    { JSON_OK, JSON_NUMBER  , "5.4e-23" },
-    { JSON_OK, JSON_NUMBER  , "0.93e+7" },
-    { JSON_OK, JSON_NUMBER  , "7e2" },
+    { JSON_OK, JSON_TOK_NUMBER  , "5.4e-23" },
+    { JSON_OK, JSON_TOK_NUMBER  , "0.93e+7" },
+    { JSON_OK, JSON_TOK_NUMBER  , "7e2" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
@@ -511,9 +518,11 @@ int main(void)
 {
   test_simple_array();
   test_simple_object();
+
   test_string_with_escapes();
   test_simple_restarts();
   test_string_with_restarts_and_escapes();
+
   test_numbers();
 
   printf("%d tests, %d failures\n", ntest,nfail);
