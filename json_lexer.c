@@ -439,20 +439,26 @@ static int parse_num(struct json_lexer *l, struct json_token *tok)
   tok->type = JSON_TOK_NUMBER;
   tok->value = &l->data[off0];
 
-  ch = jl_getc(l);
+  // ch = jl_getc(l);
   switch (l->state) {
     case JSON_LST_VALUE:
+      ch = jl_getc(l);
       break;
 
     // restarts after reading:
-    case JSON_LST_NUM_NEG:  goto st_neg;   // leading '-'
-    case JSON_LST_NUM_DIG0: goto st_dig0;  // leading '0'
-    case JSON_LST_NUM_DIG:  goto st_dig;   // leading '1' .. '9'
-    case JSON_LST_NUM_DOT:  goto st_dot;   // decimal dot '.'
-    case JSON_LST_NUM_DIGF: goto st_digf;  // '0' .. '9' after '.'
-    case JSON_LST_NUM_EXP:  goto st_exp;   // 'e' or 'E'
-    case JSON_LST_NUM_ESGN: goto st_esign; // '+' or '-' after e/E
-    case JSON_LST_NUM_EDIG: goto st_edig;  // exponent digit
+    case JSON_LST_NUM_NEG:
+      ch = jl_getc(l);
+      goto st_neg;   // leading '-'
+
+    case JSON_LST_NUM_DIG0: goto st_dig0; // leading '0'
+    case JSON_LST_NUM_DIG:  goto st_dig;  // leading '1' .. '9'
+    case JSON_LST_NUM_DOT:  goto st_dot;  // decimal dot '.'
+    case JSON_LST_NUM_DIGF: goto st_digf; // '0' .. '9' after '.'
+    case JSON_LST_NUM_EXP:  goto st_exp;  // 'e' or 'E'
+    case JSON_LST_NUM_ESGN:
+      ch = jl_getc(l);
+      goto st_esign; // '+' or '-' after e/E
+    case JSON_LST_NUM_EDIG: goto st_edig; // exponent digit
 
     default:
       return JSON_INVALID; // should never reach here!
@@ -676,7 +682,7 @@ int json_lexer_token(struct json_lexer *l, struct json_token *tok)
   case JSON_LST_NUM_EXP:
   case JSON_LST_NUM_ESGN:
   case JSON_LST_NUM_EDIG:
-    return JSON_INVALID;
+    return parse_num(l,tok);
 
   default:
     return JSON_INVALID;

@@ -345,6 +345,57 @@ void test_numbers(void)
   }
 }
 
+void test_number_restarts(void)
+{
+  const char *inputs[] = {
+    "3",
+    "456 5",
+    ".37 54.19e",
+    "+5 54.19",
+    "e-16 54.1",
+    "9E07 54.19e",
+    "+3  54.19e",
+    "17 ",
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_MORE, JSON_TOK_NUMBER, "3" },
+    { JSON_OK, JSON_TOK_NUMBER  , "456" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "5" },
+    { JSON_OK, JSON_TOK_NUMBER  , ".37" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
+    { JSON_OK, JSON_TOK_NUMBER  , "+5" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "54.19" },
+    { JSON_OK, JSON_TOK_NUMBER  , "e-16" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "54.1" },
+    { JSON_OK, JSON_TOK_NUMBER  , "9E07" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
+    { JSON_OK, JSON_TOK_NUMBER  , "+3" },
+
+    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
+    { JSON_OK, JSON_TOK_NUMBER  , "17" },
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
 int main(void)
 {
   test_simple_array();
@@ -355,6 +406,7 @@ int main(void)
   test_string_with_restarts_and_escapes();
 
   test_numbers();
+  test_number_restarts();
 
   printf("%d tests, %d failures\n", ntest,nfail);
   return nfail == 0 ? 0 : 1;
