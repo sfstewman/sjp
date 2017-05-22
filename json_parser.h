@@ -71,6 +71,12 @@ struct json_parser {
 // TODO: allow no buffer to be allocated?
 int json_parser_init(struct json_parser *p, char *stack, size_t nstack, char *vbuf, size_t nbuf);
 
+// Resets a the parser to its initial state.
+//
+// This can be used on any parser with a valid (non-NULL and unfreed)
+// stack and input buffer.
+void json_parser_reset(struct json_parser *p);
+
 // Feeds more data to the parser.
 void json_parser_more(struct json_parser *p, char *data, size_t n);
 
@@ -115,6 +121,8 @@ int json_parser_next(struct json_parser *p, struct json_event *evt);
 
 // Closes the parser.  If the parser is not in a state that's valid to
 // close, returns an error.
+//
+// The caller is responsible for free'ing any allocated buffers.
 int json_parser_close(struct json_parser *p);
 
 

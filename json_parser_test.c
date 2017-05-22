@@ -17,18 +17,19 @@ static int parser_is_sentinel(struct parser_output *out)
 
 static int parser_test_inputs(struct json_parser *p, const char *inputs[], struct parser_output *outputs)
 {
-  int i, j, more;
+  int i, j, more, close;
   char inbuf[2048];
 
   i=0;
   j=0;
   more=1;
+  close=0;
 
   while(1) {
     enum JSON_RESULT ret;
     struct json_event evt = {0};
     char buf[1024];
-    size_t n;
+    size_t n, outlen;
 
     LOG("[[ i=%d, j=%d | %d %s ]]\n",
         i,j, p->stack[p->top-1], pst2name(p->stack[p->top-1]));
@@ -59,13 +60,24 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
         return -1;
       }
 
-      snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
-      LOG("[MORE] %s\n", inbuf);
-      json_parser_more(p, inbuf, strlen(inbuf));
+      if (close) {
+        LOG("[RESET]%s\n","");
+        json_parser_reset(p);
+        close=0;
+      }
+
+      if (inputs[i] != testing_close_marker) {
+        snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
+        LOG("[MORE] %s\n", inbuf);
+        json_parser_more(p, inbuf, strlen(inbuf));
+      } else {
+        close=1;
+        LOG("[CLOSE] %s\n", "");
+      }
       i++;
     }
 
-    ret = json_parser_next(p, &evt);
+    ret = close ? json_parser_close(p) : json_parser_next(p, &evt);
 
     n = evt.n < sizeof buf ? evt.n : sizeof buf-1;
     memset(buf, 0, sizeof buf);
@@ -95,14 +107,23 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
       return -1;
     }
 
-    if (evt.n != strlen(outputs[j].text)) {
+    outlen = (outputs[j].text != NULL) ? strlen(outputs[j].text) : 0;
+
+    if (evt.n != outlen) {
       printf("i=%d, j=%d, expected text '%s' but found '%s'\n",
-          i,j, outputs[j].text, buf);
+          i,j, outputs[j].text ? outputs[j].text : "<NULL>", buf);
       return -1;
     }
 
-    more = (ret == JSON_MORE); 
+    more = (ret == JSON_MORE) || close;
     j++;
+  }
+
+  if (!close) {
+    int ret;
+    if (ret = json_parser_close(p), JSON_ERROR(ret)) {
+      return -1;
+    }
   }
 
   return 0;
@@ -139,11 +160,11 @@ failed:
   nfail++;
   printf("FAILED: %s\n", __func__);
 
-cleanup:
   if (p.stack != NULL || p.buf != NULL) {
     json_parser_close(&p);
   }
 
+cleanup:
   free(stack);
   free(buf);
 }
@@ -333,12 +354,140 @@ void test_restarts_1(void)
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
 }
 
+void test_detect_unclosed_things(void)
+{
+  const char *inputs[] = {
+    // test arrays
+    "[",
+    testing_close_marker,
+
+    "[ \"foo\"",
+    testing_close_marker,
+
+    "[ \"foo\", ",
+    testing_close_marker,
+
+    // test objects
+    "{",
+    testing_close_marker,
+
+    "{ \"foo\"",
+    testing_close_marker,
+
+    "{ \"foo\" : ",
+    testing_close_marker,
+
+    "{ \"foo\" : \"bar\"",
+    testing_close_marker,
+
+    "{ \"foo\" : \"bar\", ",
+    testing_close_marker,
+
+    // test nested structures
+    "{ \"foo\" : [ 123,",
+    testing_close_marker,
+
+    "{ \"foo\" : { \"bar\" : \"baz\"",
+    testing_close_marker,
+
+    "[ \"foo\", [ 123, \"bar\"",
+    testing_close_marker,
+
+    "[ \"foo\", { \"bar\" : \"baz\"",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct parser_output outputs[] = {
+    // test arrays
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_MORE, JSON_NONE, "," },
+    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+
+    // test objects
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_MORE, JSON_NONE, ":" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_STRING, "bar" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_STRING, "bar" },
+    { JSON_MORE, JSON_NONE, "," },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    // test nested things
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_ARRAY_BEG, "{" },
+    { JSON_OK, JSON_NUMBER, "123" },
+    { JSON_MORE, JSON_NONE, "," },
+    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "bar" },
+    { JSON_OK, JSON_STRING, "baz" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_OK, JSON_NUMBER, "123" },
+    { JSON_OK, JSON_STRING, "baz" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { JSON_OK, JSON_STRING, "foo" },
+    { JSON_OK, JSON_OBJECT_BEG, "{" },
+    { JSON_OK, JSON_STRING, "bar" },
+    { JSON_OK, JSON_STRING, "baz" },
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+
+    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+  };
+
+  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+}
+
 int main(void)
 {
   test_simple_objects();
   test_simple_arrays();
   test_nested_arrays_and_objects();
   test_restarts_1();
+
+  test_detect_unclosed_things();
 
   printf("%d tests, %d failures\n", ntest,nfail);
   return nfail == 0 ? 0 : 1;

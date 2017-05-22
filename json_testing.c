@@ -3,12 +3,41 @@
 #include <stdio.h>
 #include <string.h>
 
+const char testing_close_marker[] = { 0, 'c', 'l', 'm', 'k', 0 };
+
 int ntest = 0;
 int nfail = 0;
 
 const char *ret2name(enum JSON_RESULT ret)
 {
   switch (ret) {
+    case JSON_INTERNAL_ERROR:   
+      return "INTERNAL_ERROR";
+
+    case JSON_UNCLOSED_ARRAY:   
+      return "UNCLOSED_ARRAY";
+
+    case JSON_UNCLOSED_OBJECT:  
+      return "UNCLOSED_OBJECT";
+
+    case JSON_INVALID_PARAMS:   
+      return "INVALID_PARAMS";
+
+    case JSON_UNFINISHED_INPUT: 
+      return "UNFINISHED_INPUT";
+
+    case JSON_INVALID_INPUT:    
+      return "INVALID_INPUT";
+
+    case JSON_INVALID_CHAR:     
+      return "INVALID_CHAR";
+
+    case JSON_INVALID_ESCAPE:   
+      return "INVALID_ESCAPE";
+
+    case JSON_INVALID_U16PAIR:  
+      return "INVALID_U16PARI";
+
     case JSON_INVALID:
       return "INVALID";
 

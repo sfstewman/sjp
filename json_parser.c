@@ -6,33 +6,70 @@ static int jp_popstate(struct json_parser *p);
 static int jp_getstate(struct json_parser *p);
 static void jp_setstate(struct json_parser *p, enum JSON_PARSER_STATE st);
 
-int json_parser_init(struct json_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
+void json_parser_reset(struct json_parser *p)
 {
   json_lexer_init(&p->lex);
+  p->top = 0;
+  jp_pushstate(p,JSON_PARSER_VALUE);
+  p->off = 0;
+}
+
+int json_parser_init(struct json_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
+{
   if (nstack < JSON_PARSER_MIN_STACK || nbuf < JSON_PARSER_MIN_BUFFER) {
-    return JSON_INVALID;
+    return JSON_INVALID_PARAMS;
   }
 
   if (stack == NULL || buf == NULL) {
-    return JSON_INVALID;
+    return JSON_INVALID_PARAMS;
   }
 
   p->stack = stack;
   p->nstack = nstack;
-  p->top = 0;
-  jp_pushstate(p,JSON_PARSER_VALUE);
 
   p->buf = buf;
   p->nbuf = nbuf;
-  p->off = 0;
+
+  json_parser_reset(p);
 
   return JSON_OK;
 }
 
 int json_parser_close(struct json_parser *p)
 {
-  json_lexer_close(&p->lex);
-  return JSON_INVALID;
+  int ret;
+  if (ret = json_lexer_close(&p->lex), JSON_ERROR(ret)) {
+    return ret;
+  }
+
+  if (p->top > 1) {
+    int i;
+
+    // look at what we're waiting for...
+    for (i=p->top-1; i >= 1; i--) {
+      switch (p->stack[i]) {
+        case JSON_PARSER_VALUE:
+        case JSON_PARSER_PARTIAL:
+          break;
+
+        case JSON_PARSER_OBJ_NEW:
+        case JSON_PARSER_OBJ_KEY:
+        case JSON_PARSER_OBJ_COLON:
+        case JSON_PARSER_OBJ_VALUE:
+        case JSON_PARSER_OBJ_NEXT:
+          return JSON_UNCLOSED_OBJECT;
+
+        case JSON_PARSER_ARR_NEW:
+        case JSON_PARSER_ARR_ITEM:
+        case JSON_PARSER_ARR_NEXT:
+          return JSON_UNCLOSED_ARRAY;
+      }
+    }
+
+    return JSON_INVALID;
+  }
+
+  return JSON_OK;
 }
 
 static int jp_pushstate(struct json_parser *p, enum JSON_PARSER_STATE st)

@@ -27,6 +27,8 @@ const char *pst2name(enum JSON_PARSER_STATE st);
 const char *tok2name(enum JSON_TOKEN type);
 const char *evt2name(enum JSON_EVENT evt);
 
+// special marker to cause the test function to close the stream
+extern const char testing_close_marker[];
 
 struct lexer_output {
   enum JSON_RESULT ret;
