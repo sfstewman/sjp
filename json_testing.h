@@ -6,6 +6,10 @@
 
 #define MODULE_NAME JSON_TESTING
 
+#ifndef TEST_LOG_LEVEL
+#  define TEST_LOG_LEVEL 0
+#endif /* TEST_LOG_LEVEL */
+
 #if TEST_LOG_LEVEL > 0 
 #  define LOG(fmt, ...) printf(fmt, __VA_ARGS__)
 #else

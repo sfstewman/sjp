@@ -72,7 +72,7 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   char *b = NULL;
 
   if (l->off >= l->sz) {
-    return JSON_INVALID;
+    return JSON_INTERNAL_ERROR;
   }
 
   off0 = l->off;
@@ -165,7 +165,7 @@ invalid:
   tok->type = JSON_TOK_NONE;
   tok->value = &l->data[off0];
   tok->n = l->sz - off0;
-  return JSON_INVALID;
+  return JSON_INVALID_INPUT;
 }
 
 static int tohex(int ch)
@@ -254,7 +254,8 @@ fast_path:
     // control characters aren't allowed.  RFC 7159 defines them
     // as U+0000 to U+001F
     if (ch < 0x1f) {
-      return JSON_INVALID;
+      l->state = JSON_LST_VALUE;
+      return JSON_INVALID_CHAR;
     }
 
     if (ch == '\\') {
@@ -293,7 +294,8 @@ fast_path:
     // control characters aren't allowed.  RFC 7159 defines them
     // as U+0000 to U+001F
     if (ch < 0x1f) {
-      return JSON_INVALID;
+      l->state = JSON_LST_VALUE;
+      return JSON_INVALID_CHAR;
     }
 
     if (ch != '\\') {
@@ -308,6 +310,10 @@ read_esc:
       case EOF:
         l->state = JSON_LST_STR_ESC1;
         goto partial;
+
+      default:
+        l->state = JSON_LST_VALUE;
+        return JSON_INVALID_ESCAPE;
 
       case '"': case '\\': case '/':
         l->data[outInd++] = ch;
@@ -347,8 +353,9 @@ read_udig1:
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
-          jl_ungetc(l, ch);
-          return JSON_INVALID;
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
         }
 
         l->buf[0] = ch;
@@ -360,8 +367,9 @@ read_udig2:
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
-          jl_ungetc(l, ch);
-          return JSON_INVALID;
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
         }
 
         l->buf[1] = ch;  // in case of restart
@@ -373,8 +381,9 @@ read_udig3:
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
-          jl_ungetc(l, ch);
-          return JSON_INVALID;
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
         }
 
         l->buf[2] = ch;  // in case of restart
@@ -386,8 +395,9 @@ read_udig4:
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
-          jl_ungetc(l, ch);
-          return JSON_INVALID;
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
         }
 
         l->buf[3] = ch;  // in case of restart
@@ -461,7 +471,7 @@ static int parse_num(struct json_lexer *l, struct json_token *tok)
     case JSON_LST_NUM_EDIG: goto st_edig; // exponent digit
 
     default:
-      return JSON_INVALID; // should never reach here!
+      return JSON_INTERNAL_ERROR; // should never reach here!
   }
 
   if (ch == '-') {
@@ -479,7 +489,7 @@ st_neg:
   }
 
   if (ch < '1' || ch > '9') {
-    return JSON_INVALID;
+    goto invalid;
   }
 
 st_dig:
@@ -521,7 +531,7 @@ st_dig0:
 
   // numbers cannot have leading zeros
   if (ch >= '1' || ch <= '9') {
-    return JSON_INVALID;
+    goto invalid;
   }
 
   // otherwise we're done...
@@ -537,7 +547,7 @@ st_dot:
 
   if (ch < '0' || ch > '9') {
     // '.' must be followed by at least one digit
-    return JSON_INVALID;
+    goto invalid;
   }
 
 st_digf:
@@ -573,7 +583,7 @@ st_esign:
   }
 
   if (ch < '0' || ch > '9') {
-    return JSON_INVALID;
+    goto invalid;
   }
 
 st_edig:
@@ -598,15 +608,19 @@ finish:
   l->state = JSON_LST_VALUE;
   tok->n = l->off - off0;
   return JSON_OK;
+
+invalid:
+  l->state = JSON_LST_VALUE;
+  return JSON_INVALID_INPUT;
 }
 
 static int parse_value(struct json_lexer *l, struct json_token *tok)
 {
+  int ch;
+
   // skip whitespace
   tok->type = JSON_TOK_NONE;
   tok->value = NULL;
-
-  int ch;
 
   // Skip whitespace
   // XXX - is this the right definition of whitespace in json?
@@ -685,7 +699,7 @@ int json_lexer_token(struct json_lexer *l, struct json_token *tok)
     return parse_num(l,tok);
 
   default:
-    return JSON_INVALID;
+    return JSON_INTERNAL_ERROR;
   }
 } 
 
@@ -693,7 +707,7 @@ int json_lexer_close(struct json_lexer *l)
 {
   if (l->state != JSON_LST_VALUE) {
     l->state = JSON_LST_VALUE;
-    return JSON_INVALID;
+    return JSON_UNFINISHED_INPUT;
   }
 
   return JSON_OK;
