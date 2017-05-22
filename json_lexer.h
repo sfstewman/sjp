@@ -1,6 +1,8 @@
 #ifndef JSON_LEXER_H
 #define JSON_LEXER_H
 
+#include "json_common.h"
+
 #include <stdlib.h>
 
 #define MODULE_NAME JSON_LEXER
@@ -52,13 +54,6 @@ struct json_lexer {
   // buffer to allow restart during keyword/string/number states
   char buf[JSON_LEX_NUM_MAXLEN];
   enum JSON_LEX_STATE state;
-};
-
-enum JSON_RESULT {
-  JSON_INVALID = -1,
-  JSON_OK      =  0,
-  JSON_MORE    =  1,   // return partial token, needs more input
-  JSON_PARTIAL =  2,   // return partial token, does not need more input
 };
 
 enum JSON_TOKEN {

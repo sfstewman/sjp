@@ -1,6 +1,7 @@
 #ifndef JSON_PARSER_H
 #define JSON_PARSER_H
 
+#include "json_common.h"
 #include "json_lexer.h"
 
 #define MODULE_NAME JSON_PARSER
