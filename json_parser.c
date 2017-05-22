@@ -133,7 +133,9 @@ restart:
 
     case JSON_PARSER_PARTIAL:
       if (ret == JSON_OK) {
-        jp_popstate(p);
+        if (jp_popstate(p) != JSON_OK) {
+          return JSON_INVALID;
+        }
       }
       switch (tok.type) {
         case JSON_TOK_NULL:
