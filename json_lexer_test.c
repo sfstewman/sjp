@@ -309,6 +309,53 @@ void test_string_with_restarts_and_escapes(void)
   }
 }
 
+void test_string_with_surrogate_pairs(void)
+{
+  const char *inputs[] = {
+    "\"this string has a surrogate pair: \\uD840\\uDE13\"",
+
+    "\"this string splits the surrogate pair: \\uD840",
+    "\\uDE13\"",
+
+    "\"another split \\uD8",
+    "40\\u",
+    "DE13\"",
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_OK, JSON_TOK_STRING, "this string has a surrogate pair: \xf0\xa0\x88\x93" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this string splits the surrogate pair: " },
+    { JSON_OK, JSON_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "another split " },
+    { JSON_MORE, JSON_TOK_STRING, "" },
+    { JSON_OK, JSON_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { JSON_MORE, JSON_TOK_NONE, "" },
+
+    /*
+    { JSON_MORE, JSON_TOK_STRING, "this string splits the surrogate pair: ",
+    { JSON_MORE, JSON_TOK_NONE, "" },
+    */
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
 void test_numbers(void)
 {
   const char *inputs[] = {
@@ -404,6 +451,8 @@ int main(void)
   test_string_with_escapes();
   test_simple_restarts();
   test_string_with_restarts_and_escapes();
+
+  test_string_with_surrogate_pairs();
 
   test_numbers();
   test_number_restarts();

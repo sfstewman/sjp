@@ -213,6 +213,21 @@ static int utf8_enc(char buf[4], long cp)
   return 4;
 }
 
+static int u16cp(const char *buf)
+{
+  return (tohex(buf[0]) << 12) + (tohex(buf[1]) << 8) + (tohex(buf[2]) << 4) + tohex(buf[3]);
+}
+
+static int u16pair(const char buf[8])
+{
+  int p1 = u16cp(&buf[0]);
+  int p2 = u16cp(&buf[4]);
+  int cp = 0x10000 + ((p1 - 0xD800) << 10) | ((p2 - 0xDC00));
+
+  // fprintf(stderr, "0x%04X 0x%04X %d\n", p1,p2,cp);
+  return cp;
+}
+
 static int parse_str(struct json_lexer *l, struct json_token *tok)
 {
   size_t off0, outInd;
@@ -228,6 +243,13 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
     case JSON_LST_STR_ESC3: goto read_udig2; 
     case JSON_LST_STR_ESC4: goto read_udig3; 
     case JSON_LST_STR_ESC5: goto read_udig4;
+
+    case JSON_LST_STR_PAIR0: goto read_pair0;
+    case JSON_LST_STR_PAIR1: goto read_pair1;
+    case JSON_LST_STR_PAIR2: goto read_pair2;
+    case JSON_LST_STR_PAIR3: goto read_pair3;
+    case JSON_LST_STR_PAIR4: goto read_pair4;
+    case JSON_LST_STR_PAIR5: goto read_pair5;
 
     case JSON_LST_VALUE:
       l->state = JSON_LST_STR;
@@ -402,9 +424,102 @@ read_udig4:
 
         l->buf[3] = ch;  // in case of restart
 
-        // now calculate unicode char
-        cp = (tohex(l->buf[0]) << 12) + (tohex(l->buf[1]) << 8) + (tohex(l->buf[2]) << 4) + tohex(l->buf[3]);
+        // check if the character is a surrogate pair
+        if (l->buf[0] == 'D' && tohex(l->buf[1]) >= 8) {
+          goto read_pair0;
+        }
 
+/* encode_bmp: */
+        // now calculate unicode char for BMP
+        cp = u16cp(&l->buf[0]);
+        goto encode_utf8;
+
+read_pair0:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR0;
+          goto partial;
+        }
+
+        // TODO - optionally allow invalid U+DCXX sequences
+        // if the next character isn't a '\'
+        if (ch != '\\') {
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_U16PAIR;
+        }
+
+read_pair1:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR1;
+          goto partial;
+        }
+
+        // TODO - optionally allow invalid U+DCXX sequences
+        // if the next character is a valid escape character
+        if (ch != 'u') {
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_U16PAIR;
+        }
+
+read_pair2:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR2;
+          goto partial;
+        }
+
+        if (hexdig = tohex(ch), hexdig < 0) {
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
+        }
+
+        l->buf[4] = ch;  // in case of restart
+
+read_pair3:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR3;
+          goto partial;
+        }
+
+        if (hexdig = tohex(ch), hexdig < 0) {
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
+        }
+
+        l->buf[5] = ch;  // in case of restart
+
+read_pair4:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR4;
+          goto partial;
+        }
+
+        if (hexdig = tohex(ch), hexdig < 0) {
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
+        }
+
+        l->buf[6] = ch;  // in case of restart
+
+read_pair5:
+        if (ch = jl_getc(l), ch == EOF) {
+          l->state = JSON_LST_STR_PAIR5;
+          goto partial;
+        }
+
+        if (hexdig = tohex(ch), hexdig < 0) {
+          // jl_ungetc(l, ch);
+          l->state = JSON_LST_VALUE;
+          return JSON_INVALID_ESCAPE;
+        }
+
+        l->buf[7] = ch;  // in case of restart
+
+        cp = u16pair(&l->buf[0]);
+        goto encode_utf8;
+
+encode_utf8:
         // now encode the codepoint into utf8 in l->buf
         {
           int i,nb;
@@ -427,7 +542,9 @@ read_udig4:
           // otherwise keep going...
           for (i=0; i < nb; i++) {
             l->data[outInd++] = l->buf[i];
+            // fprintf(stderr, "0x%02X ", (unsigned char)l->buf[i]);
           }
+          // fprintf(stderr, "\n");
         }
 
         break;
@@ -686,6 +803,12 @@ int json_lexer_token(struct json_lexer *l, struct json_token *tok)
   case JSON_LST_STR_ESC3:
   case JSON_LST_STR_ESC4:
   case JSON_LST_STR_ESC5:
+  case JSON_LST_STR_PAIR0:
+  case JSON_LST_STR_PAIR1:
+  case JSON_LST_STR_PAIR2:
+  case JSON_LST_STR_PAIR3:
+  case JSON_LST_STR_PAIR4:
+  case JSON_LST_STR_PAIR5:
     return parse_str(l,tok);
 
   case JSON_LST_NUM_NEG:

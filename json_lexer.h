@@ -26,6 +26,14 @@ enum JSON_LEX_STATE {
   JSON_LST_STR_ESC4, // waiting for Z
   JSON_LST_STR_ESC5, // waiting for W
 
+  // states for waiting for second \uXYZW sequence in a surrogate pair
+  JSON_LST_STR_PAIR0, // waiting for '\'
+  JSON_LST_STR_PAIR1, // waiting for 'u'
+  JSON_LST_STR_PAIR2, // waiting for X
+  JSON_LST_STR_PAIR3, // waiting for Y
+  JSON_LST_STR_PAIR4, // waiting for Z
+  JSON_LST_STR_PAIR5, // waiting for W
+
   // number states
   JSON_LST_NUM_NEG,  // read leading '-' sign
   JSON_LST_NUM_DIG0, // read leading zero digit
