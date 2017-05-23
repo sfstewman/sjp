@@ -545,6 +545,241 @@ void test_number_restarts(void)
   }
 }
 
+void test_invalid_keywords(void)
+{
+  const char *inputs[] = {
+    "trup",
+    testing_close_marker,
+
+    "raisin",
+    testing_close_marker,
+
+    "fals",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_INVALID_INPUT, JSON_TOK_NONE, "trup" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NONE, "raisin" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_NONE, "fals" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
+void test_invalid_numbers(void)
+{
+  const char *inputs[] = {
+    "--1",
+    testing_close_marker,
+
+    "-Q",
+    testing_close_marker,
+
+    "0123",
+    testing_close_marker,
+
+    "+123",
+    testing_close_marker,
+
+    "1.A",
+    testing_close_marker,
+
+    "12.e+3",
+    testing_close_marker,
+
+    "12ea",
+    testing_close_marker,
+
+    "12e1.9",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "--" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "-Q" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "01" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NONE, "+123" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "1.A" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "12.e" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "12ea" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_OK, JSON_TOK_NUMBER, "12e1" },
+    { JSON_INVALID_INPUT, JSON_TOK_NONE, ".9" },
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
+void test_unterminated_strings(void)
+{
+  const char *inputs[] = {
+    "\"this is an unterminated string",
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\",
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u",
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u1",
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u12",
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u123",
+    testing_close_marker,
+
+    "\"this is an unterminated string with only half a surrogate pair \\uD840",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with only half a surrogate pair " },
+    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
+void test_invalid_strings(void)
+{
+  const char *inputs[] = {
+    "\"only partial escape \\ \"",
+    testing_close_marker,
+
+    "\"only partial escape\\u\"",
+    testing_close_marker,
+
+    "\"only partial escape\\u1\"",
+    testing_close_marker,
+
+    "\"only partial escape\\u12\"",
+    testing_close_marker,
+
+    "\"only partial escape\\u123\"",
+    testing_close_marker,
+
+    "\"invalid escape \\Q\"",
+    testing_close_marker,
+
+    "\"only half a surrogate pair \\uD840\"",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_U16PAIR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct json_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
 int main(void)
 {
   test_simple_array();
@@ -558,6 +793,12 @@ int main(void)
 
   test_numbers();
   test_number_restarts();
+
+  test_invalid_keywords();
+  test_invalid_numbers();
+  test_unterminated_strings();
+
+  test_invalid_strings();
 
   printf("%d tests, %d failures\n", ntest,nfail);
   return nfail == 0 ? 0 : 1;
