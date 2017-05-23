@@ -58,6 +58,8 @@ struct json_lexer {
   size_t lbeg;
   size_t prev_lbeg;
   char *data;
+  uint32_t u8st;
+  uint32_t u8cp;
 
   // buffer to allow restart during keyword/string/number states
   char buf[JSON_LEX_NUM_MAXLEN];

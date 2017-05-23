@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "hoerhmann.h"
+
 #define BORDER_DELIMS "{}[]:,"
 
 static int jl_getc(struct json_lexer *l)
@@ -15,7 +17,7 @@ static int jl_getc(struct json_lexer *l)
     return EOF;
   }
 
-  ch = l->data[l->off++];
+  ch = (unsigned char)l->data[l->off++];
   if (ch == '\n') {
     l->line++;
     l->prev_lbeg = l->lbeg;
@@ -48,6 +50,9 @@ void json_lexer_init(struct json_lexer *l)
   l->line = 0;
   l->lbeg = 0;
   l->prev_lbeg = 0;
+
+  l->u8st = 0;
+  l->u8cp = 0;
 
   memset(l->buf, 0, sizeof l->buf);
   l->state = JSON_LST_VALUE;
@@ -253,6 +258,8 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
 
     case JSON_LST_VALUE:
       l->state = JSON_LST_STR;
+      l->u8st  = 0;
+      l->u8cp  = 0;
       /* fallthrough */
 
     case JSON_LST_STR:
@@ -266,6 +273,11 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
   // fast path: no escapes, scan for next '"'
 fast_path:
   while (ch = jl_getc(l), ch != EOF) {
+    if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
+      l->state = JSON_LST_VALUE;
+      return JSON_INVALID_CHAR;
+    }
+
     if (ch == '"') {
         l->state = JSON_LST_VALUE;
         tok->value = &l->data[off0];
@@ -305,6 +317,11 @@ fast_path:
   while (ch = jl_getc(l), ch != EOF) {
     long cp;
     int hexdig;
+
+    if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
+      l->state = JSON_LST_VALUE;
+      return JSON_INVALID_CHAR;
+    }
 
     if (ch == '"') {
       l->state = JSON_LST_VALUE;

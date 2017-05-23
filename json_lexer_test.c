@@ -741,6 +741,12 @@ void test_invalid_strings(void)
     "\"only half a surrogate pair \\uD840\"",
     testing_close_marker,
 
+    "\"invalid \xFF utf8 bytes\"",
+    testing_close_marker,
+
+    "\"invalid\\t \xFF utf8 bytes on the slow path\"",
+    testing_close_marker,
+
     NULL
   };
 
@@ -764,6 +770,12 @@ void test_invalid_strings(void)
     { JSON_OK, JSON_TOK_NONE, "" },
 
     { JSON_INVALID_U16PAIR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_CHAR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { JSON_OK, JSON_TOK_NONE, "" },
+
+    { JSON_INVALID_CHAR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
     { JSON_OK, JSON_TOK_NONE, "" },
 
     { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
