@@ -1,5 +1,11 @@
 #include "json_parser.h"
 
+#if JSON_DEBUG
+#  define SHOULD_NOT_REACH() abort()
+#else
+#  define SHOULD_NOT_REACH()
+#endif /* JSON_DEBUG */
+
 static int jp_pushstate(struct json_parser *p, enum JSON_PARSER_STATE st);
 static int jp_popstate(struct json_parser *p);
 
@@ -63,19 +69,32 @@ int json_parser_close(struct json_parser *p)
         case JSON_PARSER_ARR_ITEM:
         case JSON_PARSER_ARR_NEXT:
           return JSON_UNCLOSED_ARRAY;
+
+        default:
+          return JSON_INTERNAL_ERROR;  // unknown state
       }
     }
 
-    return JSON_INVALID;
+    return JSON_INTERNAL_ERROR;
   }
 
   return JSON_OK;
 }
 
+#define PUSHSTATE(p,st) do{        \
+  int _e = jp_pushstate((p),(st)); \
+  if (JSON_ERROR(_e)) { return _e; } \
+} while(0)
+
+#define POPSTATE(p) do{      \
+  int _e = jp_popstate((p)); \
+  if (JSON_ERROR(_e)) { return _e; } \
+} while(0)
+
 static int jp_pushstate(struct json_parser *p, enum JSON_PARSER_STATE st)
 {
   if (p->top >= p->nstack) {
-    return JSON_INVALID;
+    return JSON_TOO_MUCH_NESTING;
   }
 
   p->stack[p->top++] = st;
@@ -96,7 +115,7 @@ static void jp_setstate(struct json_parser *p, enum JSON_PARSER_STATE st)
 static int jp_popstate(struct json_parser *p)
 {
   if (p->top == 0) {
-    return JSON_INVALID;
+    return JSON_INTERNAL_ERROR;
   }
 
   p->top--;
@@ -114,26 +133,20 @@ static int parse_value(struct json_parser *p, struct json_event *evt, int ret, s
 
     case '{':
       evt->type = JSON_OBJECT_BEG;
-      if (jp_pushstate(p, JSON_PARSER_OBJ_NEW) != JSON_OK) {
-        return JSON_INVALID;
-      }
+      PUSHSTATE(p, JSON_PARSER_OBJ_NEW);
       return ret;
 
     case '[':
       evt->type = JSON_ARRAY_BEG;
-      if (jp_pushstate(p, JSON_PARSER_ARR_NEW) != JSON_OK) {
-        return JSON_INVALID;
-      }
+      PUSHSTATE(p, JSON_PARSER_ARR_NEW);
       return ret;
 
     default:
-      return JSON_INVALID;
+      return JSON_INVALID_INPUT;
   }
 
   if (ret != JSON_OK) {
-    if (jp_pushstate(p, JSON_PARSER_PARTIAL) != JSON_OK) {
-      return JSON_INVALID;
-    }
+    PUSHSTATE(p, JSON_PARSER_PARTIAL);
   }
 
   return ret;
@@ -147,13 +160,15 @@ int json_parser_next(struct json_parser *p, struct json_event *evt)
 restart:
   // XXX - stream of values?
   if (p->top == 0) {
-    return JSON_INVALID;
+    // TODO: this was initially meant to close the stream of input after
+    // the first value is read, but currently the stack should always
+    // have one item.
+    return JSON_INTERNAL_ERROR;
   }
 
   st = jp_getstate(p);
 
-  ret = json_lexer_token(&p->lex, &tok);
-  if (ret == JSON_INVALID) {
+  if (ret = json_lexer_token(&p->lex, &tok), JSON_ERROR(ret)) {
     return ret;
   }
 
@@ -170,10 +185,9 @@ restart:
 
     case JSON_PARSER_PARTIAL:
       if (ret == JSON_OK) {
-        if (jp_popstate(p) != JSON_OK) {
-          return JSON_INVALID;
-        }
+        POPSTATE(p);
       }
+
       switch (tok.type) {
         case JSON_TOK_NULL:
           evt->type = JSON_NULL;
@@ -196,16 +210,16 @@ restart:
           break;
 
         default:
-          return JSON_INVALID;
+          /* should not reach here */
+          SHOULD_NOT_REACH();
+          return JSON_INTERNAL_ERROR;
       }
       return ret;
 
     case JSON_PARSER_OBJ_NEW:
       switch (tok.type) {
         case '}':
-          if (jp_popstate(p) != JSON_OK) {
-            return JSON_INVALID;
-          }
+          POPSTATE(p);
 
           evt->type = JSON_OBJECT_END;
           return JSON_OK;
@@ -214,17 +228,17 @@ restart:
           evt->type = JSON_STRING;
           jp_setstate(p, JSON_PARSER_OBJ_KEY);
           if (ret != JSON_OK) {
-            jp_pushstate(p, JSON_PARSER_PARTIAL);
+            PUSHSTATE(p,JSON_PARSER_PARTIAL);
           }
           return ret;
 
         default:
-          return JSON_INVALID;
+          return JSON_INVALID_KEY;
       }
 
     case JSON_PARSER_OBJ_KEY:
       if (tok.type != ':') {
-        return JSON_INVALID;
+        return JSON_INVALID_INPUT;
       }
 
       jp_setstate(p, JSON_PARSER_OBJ_COLON);
@@ -241,37 +255,33 @@ restart:
           goto restart;
 
         case '}':
-          if (jp_popstate(p) != JSON_OK) {
-            return JSON_INVALID;
-          }
+          POPSTATE(p);
 
           evt->type = JSON_OBJECT_END;
           return JSON_OK;
 
         default:
-          return JSON_INVALID;
+          return JSON_INVALID_INPUT;
       }
 
     case JSON_PARSER_OBJ_NEXT:
       if (tok.type != JSON_TOK_STRING) {
-        return JSON_INVALID;
+        return JSON_INVALID_KEY;
       }
 
       evt->type = JSON_STRING;
       jp_setstate(p, JSON_PARSER_OBJ_KEY);
       if (ret != JSON_OK) {
-        jp_pushstate(p, JSON_PARSER_PARTIAL);
+        PUSHSTATE(p, JSON_PARSER_PARTIAL);
       }
       return ret;
 
     case JSON_PARSER_ARR_NEW:
       if (tok.type == ']') {
-          if (jp_popstate(p) != JSON_OK) {
-            return JSON_INVALID;
-          }
+        POPSTATE(p);
 
-          evt->type = JSON_ARRAY_END;
-          return JSON_OK;
+        evt->type = JSON_ARRAY_END;
+        return JSON_OK;
       }
 
       jp_setstate(p, JSON_PARSER_ARR_ITEM);
@@ -284,15 +294,13 @@ restart:
           goto restart;
 
         case ']':
-          if (jp_popstate(p) != JSON_OK) {
-            return JSON_INVALID;
-          }
+          POPSTATE(p);
 
           evt->type = JSON_ARRAY_END;
           return JSON_OK;
 
         default:
-          return JSON_INVALID;
+          return JSON_INVALID_INPUT;
       }
 
     case JSON_PARSER_ARR_NEXT:
@@ -300,10 +308,11 @@ restart:
       return parse_value(p, evt, ret, &tok);
 
     default:
-      return JSON_INVALID;
+      return JSON_INTERNAL_ERROR;
   }
 
-  return JSON_INVALID;
+  SHOULD_NOT_REACH();
+  return JSON_INTERNAL_ERROR;
 }
 
 void json_parser_more(struct json_parser *p, char *data, size_t n)

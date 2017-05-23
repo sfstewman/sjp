@@ -260,7 +260,7 @@ static int parse_str(struct json_lexer *l, struct json_token *tok)
 
     default:
       /* should never reach */
-      abort();
+      return JSON_INTERNAL_ERROR;
   }
 
   // fast path: no escapes, scan for next '"'
@@ -728,6 +728,7 @@ finish:
 
 invalid:
   l->state = JSON_LST_VALUE;
+  tok->n = l->off - off0;
   return JSON_INVALID_INPUT;
 }
 

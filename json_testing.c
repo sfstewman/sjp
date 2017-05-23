@@ -11,8 +11,14 @@ int nfail = 0;
 const char *ret2name(enum JSON_RESULT ret)
 {
   switch (ret) {
+    case JSON_TOO_MUCH_NESTING:
+      return "TOO_MUCH_NESTING";
+
     case JSON_INTERNAL_ERROR:   
       return "INTERNAL_ERROR";
+
+    case JSON_INVALID_KEY:
+      return "INVALID_KEY";
 
     case JSON_UNCLOSED_ARRAY:   
       return "UNCLOSED_ARRAY";
@@ -36,10 +42,12 @@ const char *ret2name(enum JSON_RESULT ret)
       return "INVALID_ESCAPE";
 
     case JSON_INVALID_U16PAIR:  
-      return "INVALID_U16PARI";
+      return "INVALID_U16PAIR";
 
+    /*
     case JSON_INVALID:
       return "INVALID";
+    */
 
     case JSON_OK:
       return "OK";
@@ -129,93 +137,5 @@ const char *evt2name(enum JSON_EVENT evt)
     case JSON_ARRAY_END: return "ARRAY_END";
     default: return "UNKNOWN";
   }
-}
-
-int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer_output *outputs)
-{
-  int i, j, more;
-  char inbuf[2048];
-
-  json_lexer_init(lex);
-
-  i=0;
-  j=0;
-  more=1;
-
-  while(1) {
-    enum JSON_RESULT ret;
-    struct json_token tok = {0};
-    char buf[1024];
-    size_t n;
-
-    LOG("[[ i=%d, j=%d | %d %s ]]\n",
-        i,j, lex->state, lst2name(lex->state));
-
-    if (lex_is_sentinel(&outputs[j])) {
-      if (inputs[i] != NULL) {
-        printf("expected outputs finished, but there are still more inputs:\n"
-            "current input %d: %s\n",
-            i, inputs[i]);
-        return -1;
-      }
-
-      return 0;
-    }
-
-    if (more) {
-      if (inputs[i] == NULL) {
-        printf("expected input finished, but there are still more outputs:\n"
-            "current output %d: %d %d %s\n",
-            j, outputs[i].ret, outputs[i].type, outputs[i].value);
-        return -1;
-      }
-
-      snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
-      LOG("[MORE] %s\n", inbuf);
-      json_lexer_more(lex, inbuf, strlen(inbuf));
-      i++;
-    }
-
-    ret = json_lexer_token(lex, &tok);
-
-    n = tok.n < sizeof buf ? tok.n : sizeof buf-1;
-    memset(buf, 0, sizeof buf);
-    if (n > 0) {
-      LOG("[VAL ] %zu chars in value\n", n);
-      memcpy(buf, tok.value, n);
-    }
-
-    LOG("[TOK ] %3d %3d %8s %8s | %s\n",
-        ret, tok.type,
-        ret2name(ret), tok2name(tok.type),
-        buf);
-
-    if (ret != outputs[j].ret) {
-      printf("i=%d, j=%d, expected return %d (%s), but found %d (%s)\n",
-          i,j,
-          outputs[j].ret, ret2name(outputs[j].ret),
-          ret, ret2name(ret));
-      return -1;
-    }
-
-    if (tok.type != outputs[j].type) {
-      printf("i=%d, j=%d, expected type %d (%s), but found %d (%s)\n",
-          i,j,
-          outputs[j].type, tok2name(outputs[j].type),
-          tok.type, tok2name(tok.type));
-      return -1;
-    }
-
-    if (tok.n != strlen(outputs[j].value)) {
-      printf("i=%d, j=%d, expected value '%s' but found '%s'\n",
-          i,j, outputs[j].value, buf);
-      return -1;
-    }
-
-    more = (ret == JSON_MORE); 
-    j++;
-  }
-
-  return 0;
 }
 

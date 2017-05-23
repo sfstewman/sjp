@@ -1,6 +1,6 @@
 #include "json_parser.h"
 
-#define TEST_LOG_LEVEL 1
+#define TEST_LOG_LEVEL 0
 #include "json_testing.h"
 
 #include <stdio.h>
@@ -357,6 +357,16 @@ void test_restarts_1(void)
 void test_detect_unclosed_things(void)
 {
   const char *inputs[] = {
+    // make sure we return the lexer errors
+    "\"foo",
+    testing_close_marker,
+
+    "nul",
+    testing_close_marker,
+
+    "123.5e",
+    testing_close_marker,
+
     // test arrays
     "[",
     testing_close_marker,
@@ -400,6 +410,16 @@ void test_detect_unclosed_things(void)
   };
 
   struct parser_output outputs[] = {
+    // test lexer errors
+    { JSON_MORE, JSON_STRING, "foo" },
+    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+
+    { JSON_MORE, JSON_NONE, "" },
+    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+
+    { JSON_MORE, JSON_NUMBER, "123.5e" },
+    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+
     // test arrays
     { JSON_OK, JSON_ARRAY_BEG, "[" },
     { JSON_MORE, JSON_NONE, "" },

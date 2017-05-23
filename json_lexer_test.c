@@ -1,8 +1,110 @@
 #include "json_lexer.h"
 
+#define TEST_LOG_LEVEL 0
 #include "json_testing.h"
 
 #include <stdio.h>
+#include <string.h>
+
+int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer_output *outputs)
+{
+  int i, j, more, close;
+  char inbuf[2048];
+
+  json_lexer_init(lex);
+
+  i=0;
+  j=0;
+  more=1;
+  close=0;
+
+  while(1) {
+    enum JSON_RESULT ret;
+    struct json_token tok = {0};
+    char buf[1024];
+    size_t n;
+
+    LOG("[[ i=%d, j=%d | %d %s ]]\n",
+        i,j, lex->state, lst2name(lex->state));
+
+    if (lex_is_sentinel(&outputs[j])) {
+      if (inputs[i] != NULL) {
+        printf("expected outputs finished, but there are still more inputs:\n"
+            "current input %d: %s\n",
+            i, inputs[i]);
+        return -1;
+      }
+
+      return 0;
+    }
+
+    if (more) {
+      if (inputs[i] == NULL) {
+        printf("expected input finished, but there are still more outputs:\n"
+            "current output %d: %d %d %s\n",
+            j, outputs[i].ret, outputs[i].type, outputs[i].value);
+        return -1;
+      }
+
+      if (close) {
+        LOG("[RESET]%s\n","");
+        json_lexer_init(lex);
+        close=0;
+      }
+
+      if (inputs[i] != testing_close_marker) {
+        snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
+        LOG("[MORE] %s\n", inbuf);
+        json_lexer_more(lex, inbuf, strlen(inbuf));
+      } else {
+        close=1;
+        LOG("[CLOSE] %s\n", "");
+      }
+      i++;
+    }
+
+    ret = close ? json_lexer_close(lex) : json_lexer_token(lex, &tok);
+
+    n = tok.n < sizeof buf ? tok.n : sizeof buf-1;
+    memset(buf, 0, sizeof buf);
+    if (n > 0) {
+      LOG("[VAL ] %zu chars in value\n", n);
+      memcpy(buf, tok.value, n);
+    }
+
+    LOG("[TOK ] %3d %3d %8s %8s | %s\n",
+        ret, tok.type,
+        ret2name(ret), tok2name(tok.type),
+        buf);
+
+    if (ret != outputs[j].ret) {
+      printf("i=%d, j=%d, expected return %d (%s), but found %d (%s)\n",
+          i,j,
+          outputs[j].ret, ret2name(outputs[j].ret),
+          ret, ret2name(ret));
+      return -1;
+    }
+
+    if (tok.type != outputs[j].type) {
+      printf("i=%d, j=%d, expected type %d (%s), but found %d (%s)\n",
+          i,j,
+          outputs[j].type, tok2name(outputs[j].type),
+          tok.type, tok2name(tok.type));
+      return -1;
+    }
+
+    if (tok.n != strlen(outputs[j].value)) {
+      printf("i=%d, j=%d, expected value '%s' but found '%s'\n",
+          i,j, outputs[j].value, buf);
+      return -1;
+    }
+
+    more = (ret == JSON_MORE) || JSON_ERROR(ret) || close;
+    j++;
+  }
+
+  return 0;
+}
 
 void test_simple_array(void)
 {
