@@ -846,10 +846,17 @@ int sjp_lexer_token(struct sjp_lexer *l, struct sjp_token *tok)
 
 int sjp_lexer_close(struct sjp_lexer *l)
 {
-  if (l->state != SJP_LST_VALUE) {
-    l->state = SJP_LST_VALUE;
-    return SJP_UNFINISHED_INPUT;
-  }
+  switch (l->state) {
+    case SJP_LST_VALUE:
+    case SJP_LST_NUM_DIG0:
+    case SJP_LST_NUM_DIG:
+    case SJP_LST_NUM_DIGF:
+    case SJP_LST_NUM_EDIG:
+      l->state = SJP_LST_VALUE;
+      return SJP_OK;
 
-  return SJP_OK;
+    default:
+      l->state = SJP_LST_VALUE;
+      return SJP_UNFINISHED_INPUT;
+  }
 }

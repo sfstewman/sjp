@@ -41,46 +41,6 @@ int sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf,
   return SJP_OK;
 }
 
-int sjp_parser_close(struct sjp_parser *p)
-{
-  int ret;
-  if (ret = sjp_lexer_close(&p->lex), SJP_ERROR(ret)) {
-    return ret;
-  }
-
-  if (p->top > 1) {
-    int i;
-
-    // look at what we're waiting for...
-    for (i=p->top-1; i >= 1; i--) {
-      switch (p->stack[i]) {
-        case SJP_PARSER_VALUE:
-        case SJP_PARSER_PARTIAL:
-          break;
-
-        case SJP_PARSER_OBJ_NEW:
-        case SJP_PARSER_OBJ_KEY:
-        case SJP_PARSER_OBJ_COLON:
-        case SJP_PARSER_OBJ_VALUE:
-        case SJP_PARSER_OBJ_NEXT:
-          return SJP_UNCLOSED_OBJECT;
-
-        case SJP_PARSER_ARR_NEW:
-        case SJP_PARSER_ARR_ITEM:
-        case SJP_PARSER_ARR_NEXT:
-          return SJP_UNCLOSED_ARRAY;
-
-        default:
-          return SJP_INTERNAL_ERROR;  // unknown state
-      }
-    }
-
-    return SJP_INTERNAL_ERROR;
-  }
-
-  return SJP_OK;
-}
-
 #define PUSHSTATE(p,st) do{        \
   int _e = jp_pushstate((p),(st)); \
   if (SJP_ERROR(_e)) { return _e; } \
@@ -319,3 +279,48 @@ void sjp_parser_more(struct sjp_parser *p, char *data, size_t n)
 {
   sjp_lexer_more(&p->lex, data, n);
 }
+
+int sjp_parser_close(struct sjp_parser *p)
+{
+  int ret;
+  if (ret = sjp_lexer_close(&p->lex), SJP_ERROR(ret)) {
+    return ret;
+  }
+
+  if (jp_getstate(p) == SJP_PARSER_PARTIAL) {
+    POPSTATE(p);
+  }
+
+  if (p->top > 1) {
+    int i;
+
+    // look at what we're waiting for...
+    for (i=p->top-1; i >= 1; i--) {
+      switch (p->stack[i]) {
+        case SJP_PARSER_VALUE:
+        case SJP_PARSER_PARTIAL:
+          break;
+
+        case SJP_PARSER_OBJ_NEW:
+        case SJP_PARSER_OBJ_KEY:
+        case SJP_PARSER_OBJ_COLON:
+        case SJP_PARSER_OBJ_VALUE:
+        case SJP_PARSER_OBJ_NEXT:
+          return SJP_UNCLOSED_OBJECT;
+
+        case SJP_PARSER_ARR_NEW:
+        case SJP_PARSER_ARR_ITEM:
+        case SJP_PARSER_ARR_NEXT:
+          return SJP_UNCLOSED_ARRAY;
+
+        default:
+          return SJP_INTERNAL_ERROR;  // unknown state
+      }
+    }
+
+    return SJP_INTERNAL_ERROR;
+  }
+
+  return SJP_OK;
+}
+

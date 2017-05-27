@@ -494,6 +494,39 @@ void test_numbers(void)
   }
 }
 
+void test_numbers_with_close(void)
+{
+  const char *inputs[] = {
+    "1",
+    testing_close_marker,
+
+    "1.1",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { SJP_MORE, SJP_TOK_NUMBER  , "1" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_MORE, SJP_TOK_NUMBER  , "1.1" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct sjp_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
 void test_number_restarts(void)
 {
   const char *inputs[] = {
@@ -804,6 +837,7 @@ int main(void)
   test_string_with_surrogate_pairs();
 
   test_numbers();
+  test_numbers_with_close();
   test_number_restarts();
 
   test_invalid_keywords();

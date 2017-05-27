@@ -169,6 +169,65 @@ cleanup:
   free(buf);
 }
 
+void test_values(void)
+{
+  const char *inputs[] = {
+    "\"foo bar baz\"",
+    testing_close_marker,
+
+    "1",
+    testing_close_marker,
+
+    "1.1",
+    testing_close_marker,
+
+    "1.35e-2",
+    testing_close_marker,
+
+    "true",
+    testing_close_marker,
+
+    "false",
+    testing_close_marker,
+
+    "null",
+    testing_close_marker,
+
+    NULL
+  };
+
+  struct parser_output outputs[] = {
+    { SJP_OK, SJP_STRING, "foo bar baz" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_MORE, SJP_NUMBER, "1" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_MORE, SJP_NUMBER, "1.1" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_MORE, SJP_NUMBER, "1.35e-2" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_OK, SJP_TRUE, "true" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_OK, SJP_FALSE, "false" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_OK, SJP_NULL, "null" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
+  };
+
+  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+}
+
 void test_simple_objects(void)
 {
   const char *inputs[] = {
@@ -502,6 +561,7 @@ void test_detect_unclosed_things(void)
 
 int main(void)
 {
+  test_values();
   test_simple_objects();
   test_simple_arrays();
   test_nested_arrays_and_objects();
