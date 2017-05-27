@@ -1,33 +1,33 @@
 #include "json_parser.h"
 
-#if JSON_DEBUG
+#if SJP_DEBUG
 #  define SHOULD_NOT_REACH() abort()
 #else
 #  define SHOULD_NOT_REACH()
-#endif /* JSON_DEBUG */
+#endif /* SJP_DEBUG */
 
-static int jp_pushstate(struct json_parser *p, enum JSON_PARSER_STATE st);
-static int jp_popstate(struct json_parser *p);
+static int jp_pushstate(struct sjp_parser *p, enum SJP_PARSER_STATE st);
+static int jp_popstate(struct sjp_parser *p);
 
-static int jp_getstate(struct json_parser *p);
-static void jp_setstate(struct json_parser *p, enum JSON_PARSER_STATE st);
+static int jp_getstate(struct sjp_parser *p);
+static void jp_setstate(struct sjp_parser *p, enum SJP_PARSER_STATE st);
 
-void json_parser_reset(struct json_parser *p)
+void sjp_parser_reset(struct sjp_parser *p)
 {
-  json_lexer_init(&p->lex);
+  sjp_lexer_init(&p->lex);
   p->top = 0;
-  jp_pushstate(p,JSON_PARSER_VALUE);
+  jp_pushstate(p,SJP_PARSER_VALUE);
   p->off = 0;
 }
 
-int json_parser_init(struct json_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
+int sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
 {
-  if (nstack < JSON_PARSER_MIN_STACK || nbuf < JSON_PARSER_MIN_BUFFER) {
-    return JSON_INVALID_PARAMS;
+  if (nstack < SJP_PARSER_MIN_STACK || nbuf < SJP_PARSER_MIN_BUFFER) {
+    return SJP_INVALID_PARAMS;
   }
 
   if (stack == NULL || buf == NULL) {
-    return JSON_INVALID_PARAMS;
+    return SJP_INVALID_PARAMS;
   }
 
   p->stack = stack;
@@ -36,15 +36,15 @@ int json_parser_init(struct json_parser *p, char *stack, size_t nstack, char *bu
   p->buf = buf;
   p->nbuf = nbuf;
 
-  json_parser_reset(p);
+  sjp_parser_reset(p);
 
-  return JSON_OK;
+  return SJP_OK;
 }
 
-int json_parser_close(struct json_parser *p)
+int sjp_parser_close(struct sjp_parser *p)
 {
   int ret;
-  if (ret = json_lexer_close(&p->lex), JSON_ERROR(ret)) {
+  if (ret = sjp_lexer_close(&p->lex), SJP_ERROR(ret)) {
     return ret;
   }
 
@@ -54,107 +54,107 @@ int json_parser_close(struct json_parser *p)
     // look at what we're waiting for...
     for (i=p->top-1; i >= 1; i--) {
       switch (p->stack[i]) {
-        case JSON_PARSER_VALUE:
-        case JSON_PARSER_PARTIAL:
+        case SJP_PARSER_VALUE:
+        case SJP_PARSER_PARTIAL:
           break;
 
-        case JSON_PARSER_OBJ_NEW:
-        case JSON_PARSER_OBJ_KEY:
-        case JSON_PARSER_OBJ_COLON:
-        case JSON_PARSER_OBJ_VALUE:
-        case JSON_PARSER_OBJ_NEXT:
-          return JSON_UNCLOSED_OBJECT;
+        case SJP_PARSER_OBJ_NEW:
+        case SJP_PARSER_OBJ_KEY:
+        case SJP_PARSER_OBJ_COLON:
+        case SJP_PARSER_OBJ_VALUE:
+        case SJP_PARSER_OBJ_NEXT:
+          return SJP_UNCLOSED_OBJECT;
 
-        case JSON_PARSER_ARR_NEW:
-        case JSON_PARSER_ARR_ITEM:
-        case JSON_PARSER_ARR_NEXT:
-          return JSON_UNCLOSED_ARRAY;
+        case SJP_PARSER_ARR_NEW:
+        case SJP_PARSER_ARR_ITEM:
+        case SJP_PARSER_ARR_NEXT:
+          return SJP_UNCLOSED_ARRAY;
 
         default:
-          return JSON_INTERNAL_ERROR;  // unknown state
+          return SJP_INTERNAL_ERROR;  // unknown state
       }
     }
 
-    return JSON_INTERNAL_ERROR;
+    return SJP_INTERNAL_ERROR;
   }
 
-  return JSON_OK;
+  return SJP_OK;
 }
 
 #define PUSHSTATE(p,st) do{        \
   int _e = jp_pushstate((p),(st)); \
-  if (JSON_ERROR(_e)) { return _e; } \
+  if (SJP_ERROR(_e)) { return _e; } \
 } while(0)
 
 #define POPSTATE(p) do{      \
   int _e = jp_popstate((p)); \
-  if (JSON_ERROR(_e)) { return _e; } \
+  if (SJP_ERROR(_e)) { return _e; } \
 } while(0)
 
-static int jp_pushstate(struct json_parser *p, enum JSON_PARSER_STATE st)
+static int jp_pushstate(struct sjp_parser *p, enum SJP_PARSER_STATE st)
 {
   if (p->top >= p->nstack) {
-    return JSON_TOO_MUCH_NESTING;
+    return SJP_TOO_MUCH_NESTING;
   }
 
   p->stack[p->top++] = st;
 
-  return JSON_OK;
+  return SJP_OK;
 }
 
-static int jp_getstate(struct json_parser *p)
+static int jp_getstate(struct sjp_parser *p)
 {
   return p->stack[p->top-1];
 }
 
-static void jp_setstate(struct json_parser *p, enum JSON_PARSER_STATE st)
+static void jp_setstate(struct sjp_parser *p, enum SJP_PARSER_STATE st)
 {
   p->stack[p->top-1] = st;
 }
 
-static int jp_popstate(struct json_parser *p)
+static int jp_popstate(struct sjp_parser *p)
 {
   if (p->top == 0) {
-    return JSON_INTERNAL_ERROR;
+    return SJP_INTERNAL_ERROR;
   }
 
   p->top--;
-  return JSON_OK;
+  return SJP_OK;
 }
 
-static int parse_value(struct json_parser *p, struct json_event *evt, int ret, struct json_token *tok)
+static int parse_value(struct sjp_parser *p, struct sjp_event *evt, int ret, struct sjp_token *tok)
 {
   switch (tok->type) {
-    case JSON_TOK_NULL:   evt->type = JSON_NULL;   break;
-    case JSON_TOK_TRUE:   evt->type = JSON_TRUE;   break;
-    case JSON_TOK_FALSE:  evt->type = JSON_FALSE;  break;
-    case JSON_TOK_STRING: evt->type = JSON_STRING; break;
-    case JSON_TOK_NUMBER: evt->type = JSON_NUMBER; break;
+    case SJP_TOK_NULL:   evt->type = SJP_NULL;   break;
+    case SJP_TOK_TRUE:   evt->type = SJP_TRUE;   break;
+    case SJP_TOK_FALSE:  evt->type = SJP_FALSE;  break;
+    case SJP_TOK_STRING: evt->type = SJP_STRING; break;
+    case SJP_TOK_NUMBER: evt->type = SJP_NUMBER; break;
 
     case '{':
-      evt->type = JSON_OBJECT_BEG;
-      PUSHSTATE(p, JSON_PARSER_OBJ_NEW);
+      evt->type = SJP_OBJECT_BEG;
+      PUSHSTATE(p, SJP_PARSER_OBJ_NEW);
       return ret;
 
     case '[':
-      evt->type = JSON_ARRAY_BEG;
-      PUSHSTATE(p, JSON_PARSER_ARR_NEW);
+      evt->type = SJP_ARRAY_BEG;
+      PUSHSTATE(p, SJP_PARSER_ARR_NEW);
       return ret;
 
     default:
-      return JSON_INVALID_INPUT;
+      return SJP_INVALID_INPUT;
   }
 
-  if (ret != JSON_OK) {
-    PUSHSTATE(p, JSON_PARSER_PARTIAL);
+  if (ret != SJP_OK) {
+    PUSHSTATE(p, SJP_PARSER_PARTIAL);
   }
 
   return ret;
 }
 
-int json_parser_next(struct json_parser *p, struct json_event *evt)
+int sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt)
 {
-  struct json_token tok = {0};
+  struct sjp_token tok = {0};
   int st,ret;
 
 restart:
@@ -163,16 +163,16 @@ restart:
     // TODO: this was initially meant to close the stream of input after
     // the first value is read, but currently the stack should always
     // have one item.
-    return JSON_INTERNAL_ERROR;
+    return SJP_INTERNAL_ERROR;
   }
 
   st = jp_getstate(p);
 
-  if (ret = json_lexer_token(&p->lex, &tok), JSON_ERROR(ret)) {
+  if (ret = sjp_lexer_token(&p->lex, &tok), SJP_ERROR(ret)) {
     return ret;
   }
 
-  if (ret == JSON_MORE && tok.type == JSON_NONE) {
+  if (ret == SJP_MORE && tok.type == SJP_NONE) {
     return ret;
   }
 
@@ -180,142 +180,142 @@ restart:
   evt->n = tok.n;
 
   switch (st) {
-    case JSON_PARSER_VALUE:
+    case SJP_PARSER_VALUE:
       return parse_value(p, evt, ret, &tok);
 
-    case JSON_PARSER_PARTIAL:
-      if (ret == JSON_OK) {
+    case SJP_PARSER_PARTIAL:
+      if (ret == SJP_OK) {
         POPSTATE(p);
       }
 
       switch (tok.type) {
-        case JSON_TOK_NULL:
-          evt->type = JSON_NULL;
+        case SJP_TOK_NULL:
+          evt->type = SJP_NULL;
           break;
 
-        case JSON_TOK_TRUE:
-          evt->type = JSON_TRUE;
+        case SJP_TOK_TRUE:
+          evt->type = SJP_TRUE;
           break;
 
-        case JSON_TOK_FALSE:
-          evt->type = JSON_FALSE;
+        case SJP_TOK_FALSE:
+          evt->type = SJP_FALSE;
           break;
 
-        case JSON_TOK_STRING:
-          evt->type = JSON_STRING;
+        case SJP_TOK_STRING:
+          evt->type = SJP_STRING;
           break;
 
-        case JSON_TOK_NUMBER:
-          evt->type = JSON_NUMBER;
+        case SJP_TOK_NUMBER:
+          evt->type = SJP_NUMBER;
           break;
 
         default:
           /* should not reach here */
           SHOULD_NOT_REACH();
-          return JSON_INTERNAL_ERROR;
+          return SJP_INTERNAL_ERROR;
       }
       return ret;
 
-    case JSON_PARSER_OBJ_NEW:
+    case SJP_PARSER_OBJ_NEW:
       switch (tok.type) {
         case '}':
           POPSTATE(p);
 
-          evt->type = JSON_OBJECT_END;
-          return JSON_OK;
+          evt->type = SJP_OBJECT_END;
+          return SJP_OK;
 
-        case JSON_TOK_STRING:
-          evt->type = JSON_STRING;
-          jp_setstate(p, JSON_PARSER_OBJ_KEY);
-          if (ret != JSON_OK) {
-            PUSHSTATE(p,JSON_PARSER_PARTIAL);
+        case SJP_TOK_STRING:
+          evt->type = SJP_STRING;
+          jp_setstate(p, SJP_PARSER_OBJ_KEY);
+          if (ret != SJP_OK) {
+            PUSHSTATE(p,SJP_PARSER_PARTIAL);
           }
           return ret;
 
         default:
-          return JSON_INVALID_KEY;
+          return SJP_INVALID_KEY;
       }
 
-    case JSON_PARSER_OBJ_KEY:
+    case SJP_PARSER_OBJ_KEY:
       if (tok.type != ':') {
-        return JSON_INVALID_INPUT;
+        return SJP_INVALID_INPUT;
       }
 
-      jp_setstate(p, JSON_PARSER_OBJ_COLON);
+      jp_setstate(p, SJP_PARSER_OBJ_COLON);
       goto restart;
 
-    case JSON_PARSER_OBJ_COLON:
-      jp_setstate(p, JSON_PARSER_OBJ_VALUE);
+    case SJP_PARSER_OBJ_COLON:
+      jp_setstate(p, SJP_PARSER_OBJ_VALUE);
       return parse_value(p, evt, ret, &tok);
 
-    case JSON_PARSER_OBJ_VALUE:
+    case SJP_PARSER_OBJ_VALUE:
       switch (tok.type) {
         case ',':
-          jp_setstate(p, JSON_PARSER_OBJ_NEXT);
+          jp_setstate(p, SJP_PARSER_OBJ_NEXT);
           goto restart;
 
         case '}':
           POPSTATE(p);
 
-          evt->type = JSON_OBJECT_END;
-          return JSON_OK;
+          evt->type = SJP_OBJECT_END;
+          return SJP_OK;
 
         default:
-          return JSON_INVALID_INPUT;
+          return SJP_INVALID_INPUT;
       }
 
-    case JSON_PARSER_OBJ_NEXT:
-      if (tok.type != JSON_TOK_STRING) {
-        return JSON_INVALID_KEY;
+    case SJP_PARSER_OBJ_NEXT:
+      if (tok.type != SJP_TOK_STRING) {
+        return SJP_INVALID_KEY;
       }
 
-      evt->type = JSON_STRING;
-      jp_setstate(p, JSON_PARSER_OBJ_KEY);
-      if (ret != JSON_OK) {
-        PUSHSTATE(p, JSON_PARSER_PARTIAL);
+      evt->type = SJP_STRING;
+      jp_setstate(p, SJP_PARSER_OBJ_KEY);
+      if (ret != SJP_OK) {
+        PUSHSTATE(p, SJP_PARSER_PARTIAL);
       }
       return ret;
 
-    case JSON_PARSER_ARR_NEW:
+    case SJP_PARSER_ARR_NEW:
       if (tok.type == ']') {
         POPSTATE(p);
 
-        evt->type = JSON_ARRAY_END;
-        return JSON_OK;
+        evt->type = SJP_ARRAY_END;
+        return SJP_OK;
       }
 
-      jp_setstate(p, JSON_PARSER_ARR_ITEM);
+      jp_setstate(p, SJP_PARSER_ARR_ITEM);
       return parse_value(p, evt, ret, &tok);
 
-    case JSON_PARSER_ARR_ITEM:
+    case SJP_PARSER_ARR_ITEM:
       switch (tok.type) {
         case ',':
-          jp_setstate(p, JSON_PARSER_ARR_NEXT);
+          jp_setstate(p, SJP_PARSER_ARR_NEXT);
           goto restart;
 
         case ']':
           POPSTATE(p);
 
-          evt->type = JSON_ARRAY_END;
-          return JSON_OK;
+          evt->type = SJP_ARRAY_END;
+          return SJP_OK;
 
         default:
-          return JSON_INVALID_INPUT;
+          return SJP_INVALID_INPUT;
       }
 
-    case JSON_PARSER_ARR_NEXT:
-      jp_setstate(p, JSON_PARSER_ARR_ITEM);
+    case SJP_PARSER_ARR_NEXT:
+      jp_setstate(p, SJP_PARSER_ARR_ITEM);
       return parse_value(p, evt, ret, &tok);
 
     default:
-      return JSON_INTERNAL_ERROR;
+      return SJP_INTERNAL_ERROR;
   }
 
   SHOULD_NOT_REACH();
-  return JSON_INTERNAL_ERROR;
+  return SJP_INTERNAL_ERROR;
 }
 
-void json_parser_more(struct json_parser *p, char *data, size_t n)
+void sjp_parser_more(struct sjp_parser *p, char *data, size_t n)
 {
-  json_lexer_more(&p->lex, data, n);
+  sjp_lexer_more(&p->lex, data, n);
 }

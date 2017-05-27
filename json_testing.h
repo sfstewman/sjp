@@ -1,10 +1,10 @@
-#ifndef JSON_TESTING_H
-#define JSON_TESTING_H
+#ifndef SJP_TESTING_H
+#define SJP_TESTING_H
 
 #include "json_lexer.h"
 #include "json_parser.h"
 
-#define MODULE_NAME JSON_TESTING
+#define MODULE_NAME SJP_TESTING
 
 #ifndef TEST_LOG_LEVEL
 #  define TEST_LOG_LEVEL 0
@@ -19,37 +19,37 @@
 extern int ntest;
 extern int nfail;
 
-const char *ret2name(enum JSON_RESULT ret);
+const char *ret2name(enum SJP_RESULT ret);
 
-const char *lst2name(enum JSON_LEX_STATE st);
-const char *pst2name(enum JSON_PARSER_STATE st);
+const char *lst2name(enum SJP_LEX_STATE st);
+const char *pst2name(enum SJP_PARSER_STATE st);
 
-const char *tok2name(enum JSON_TOKEN type);
-const char *evt2name(enum JSON_EVENT evt);
+const char *tok2name(enum SJP_TOKEN type);
+const char *evt2name(enum SJP_EVENT evt);
 
 // special marker to cause the test function to close the stream
 extern const char testing_close_marker[];
 
 struct lexer_output {
-  enum JSON_RESULT ret;
-  enum JSON_TOKEN type;
+  enum SJP_RESULT ret;
+  enum SJP_TOKEN type;
   const char *value;
 };
 
 static inline int lex_is_sentinel(struct lexer_output *out)
 {
-  return out->ret == JSON_OK && out->type == JSON_TOK_NONE && out->value == NULL;
+  return out->ret == SJP_OK && out->type == SJP_TOK_NONE && out->value == NULL;
 }
 
-int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer_output *outputs);
+int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_output *outputs);
 
 struct parser_output {
-  enum JSON_RESULT ret;
-  enum JSON_EVENT type;
+  enum SJP_RESULT ret;
+  enum SJP_EVENT type;
   const char *text;
 };
 
 #undef MODULE_NAME
 
-#endif /* JSON_TESTING_H */
+#endif /* SJP_TESTING_H */
 

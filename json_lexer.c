@@ -9,7 +9,7 @@
 
 #define BORDER_DELIMS "{}[]:,"
 
-static int jl_getc(struct json_lexer *l)
+static int jl_getc(struct sjp_lexer *l)
 {
   int ch;
 
@@ -27,7 +27,7 @@ static int jl_getc(struct json_lexer *l)
   return ch;
 }
 
-static void jl_ungetc(struct json_lexer *l, int ch)
+static void jl_ungetc(struct sjp_lexer *l, int ch)
 {
   if (l->off > 0) {
     l->off--;
@@ -41,7 +41,7 @@ static void jl_ungetc(struct json_lexer *l, int ch)
 }
 
 // Initializes the lexer state, reseting its state
-void json_lexer_init(struct json_lexer *l)
+void sjp_lexer_init(struct sjp_lexer *l)
 {
   l->sz = 0;
   l->off = 0;
@@ -55,21 +55,21 @@ void json_lexer_init(struct json_lexer *l)
   l->u8cp = 0;
 
   memset(l->buf, 0, sizeof l->buf);
-  l->state = JSON_LST_VALUE;
+  l->state = SJP_LST_VALUE;
 }
 
 // Sets the lexer data, resets the buffer offset.  The lexer may modify
 // the data.
 //
 // The caller may pass the same data buffer to the lexer.
-void json_lexer_more(struct json_lexer *l, char *data, size_t n)
+void sjp_lexer_more(struct sjp_lexer *l, char *data, size_t n)
 {
   l->data = data;
   l->sz = n;
   l->off = 0;
 }
 
-static int parse_kw(struct json_lexer *l, struct json_token *tok)
+static int parse_kw(struct sjp_lexer *l, struct sjp_token *tok)
 {
   int ch;
   size_t off0;
@@ -77,31 +77,31 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   char *b = NULL;
 
   if (l->off >= l->sz) {
-    return JSON_INTERNAL_ERROR;
+    return SJP_INTERNAL_ERROR;
   }
 
   off0 = l->off;
 
   // TODO: restart state
-  ch = (l->state == JSON_LST_KEYWORD) ? l->buf[0] : jl_getc(l);
+  ch = (l->state == SJP_LST_KEYWORD) ? l->buf[0] : jl_getc(l);
   switch (ch) {
     case 't':
       kw = "rue";
-      tok->type = JSON_TOK_TRUE;
+      tok->type = SJP_TOK_TRUE;
       break;
 
     case 'f':
       kw = "alse";
-      tok->type = JSON_TOK_FALSE;
+      tok->type = SJP_TOK_FALSE;
       break;
 
     case 'n':
       kw = "ull";
-      tok->type = JSON_TOK_NULL;
+      tok->type = SJP_TOK_NULL;
       break;
 
     default:
-      assert(l->state != JSON_LST_KEYWORD);
+      assert(l->state != SJP_LST_KEYWORD);
       jl_ungetc(l,ch);
       goto invalid;
   }
@@ -109,7 +109,7 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   l->buf[0] = ch;
   b = &l->buf[1];
 
-  if (l->state == JSON_LST_KEYWORD) {
+  if (l->state == SJP_LST_KEYWORD) {
     for (b = &l->buf[1]; *b != '\0'; b++, kw++) {
       assert(*kw == *b);
       continue;
@@ -137,7 +137,7 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   }
 
   // on restart, return internal buffer
-  if (l->state == JSON_LST_KEYWORD) {
+  if (l->state == SJP_LST_KEYWORD) {
     tok->value = &l->buf[0];
     tok->n = b - l->buf;
   } else {
@@ -154,23 +154,23 @@ static int parse_kw(struct json_lexer *l, struct json_token *tok)
   //
   // Need to revisit this, though.
 
-  l->state = JSON_LST_VALUE;
-  return JSON_OK;
+  l->state = SJP_LST_VALUE;
+  return SJP_OK;
 
 partial:
   *b = 0;
-  l->state = JSON_LST_KEYWORD;
-  tok->type = JSON_TOK_NONE;
+  l->state = SJP_LST_KEYWORD;
+  tok->type = SJP_TOK_NONE;
   tok->value = l->buf;
   tok->n = b - l->buf;
-  return JSON_MORE;
+  return SJP_MORE;
 
 invalid:
-  l->state = JSON_LST_VALUE;
-  tok->type = JSON_TOK_NONE;
+  l->state = SJP_LST_VALUE;
+  tok->type = SJP_TOK_NONE;
   tok->value = &l->data[off0];
   tok->n = l->sz - off0;
-  return JSON_INVALID_INPUT;
+  return SJP_INVALID_INPUT;
 }
 
 static int tohex(int ch)
@@ -233,63 +233,63 @@ static int u16pair(const char buf[8])
   return cp;
 }
 
-static int parse_str(struct json_lexer *l, struct json_token *tok)
+static int parse_str(struct sjp_lexer *l, struct sjp_token *tok)
 {
   size_t off0, outInd;
   int ch;
 
   off0 = l->off;
   outInd = off0;
-  tok->type = JSON_TOK_STRING;
+  tok->type = SJP_TOK_STRING;
 
   switch (l->state) {
-    case JSON_LST_STR_ESC1: goto read_esc;
-    case JSON_LST_STR_ESC2: goto read_udig1; 
-    case JSON_LST_STR_ESC3: goto read_udig2; 
-    case JSON_LST_STR_ESC4: goto read_udig3; 
-    case JSON_LST_STR_ESC5: goto read_udig4;
+    case SJP_LST_STR_ESC1: goto read_esc;
+    case SJP_LST_STR_ESC2: goto read_udig1; 
+    case SJP_LST_STR_ESC3: goto read_udig2; 
+    case SJP_LST_STR_ESC4: goto read_udig3; 
+    case SJP_LST_STR_ESC5: goto read_udig4;
 
-    case JSON_LST_STR_PAIR0: goto read_pair0;
-    case JSON_LST_STR_PAIR1: goto read_pair1;
-    case JSON_LST_STR_PAIR2: goto read_pair2;
-    case JSON_LST_STR_PAIR3: goto read_pair3;
-    case JSON_LST_STR_PAIR4: goto read_pair4;
-    case JSON_LST_STR_PAIR5: goto read_pair5;
+    case SJP_LST_STR_PAIR0: goto read_pair0;
+    case SJP_LST_STR_PAIR1: goto read_pair1;
+    case SJP_LST_STR_PAIR2: goto read_pair2;
+    case SJP_LST_STR_PAIR3: goto read_pair3;
+    case SJP_LST_STR_PAIR4: goto read_pair4;
+    case SJP_LST_STR_PAIR5: goto read_pair5;
 
-    case JSON_LST_VALUE:
-      l->state = JSON_LST_STR;
+    case SJP_LST_VALUE:
+      l->state = SJP_LST_STR;
       l->u8st  = 0;
       l->u8cp  = 0;
       /* fallthrough */
 
-    case JSON_LST_STR:
+    case SJP_LST_STR:
       goto fast_path;
 
     default:
       /* should never reach */
-      return JSON_INTERNAL_ERROR;
+      return SJP_INTERNAL_ERROR;
   }
 
   // fast path: no escapes, scan for next '"'
 fast_path:
   while (ch = jl_getc(l), ch != EOF) {
     if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
-      l->state = JSON_LST_VALUE;
-      return JSON_INVALID_CHAR;
+      l->state = SJP_LST_VALUE;
+      return SJP_INVALID_CHAR;
     }
 
     if (ch == '"') {
-        l->state = JSON_LST_VALUE;
+        l->state = SJP_LST_VALUE;
         tok->value = &l->data[off0];
         tok->n = l->off - off0 - 1; // last -1 is to omit the trailing "
-        return JSON_OK;
+        return SJP_OK;
     }
 
     // control characters aren't allowed.  RFC 7159 defines them
     // as U+0000 to U+001F
     if (ch < 0x1f) {
-      l->state = JSON_LST_VALUE;
-      return JSON_INVALID_CHAR;
+      l->state = SJP_LST_VALUE;
+      return SJP_INVALID_CHAR;
     }
 
     if (ch == '\\') {
@@ -307,7 +307,7 @@ fast_path:
   // a partial result
   tok->value = &l->data[off0];
   tok->n = l->off - off0;
-  return JSON_MORE;
+  return SJP_MORE;
 
   // slow_path:
   //   string has escapes, so we need to rewrite it
@@ -319,22 +319,22 @@ fast_path:
     int hexdig;
 
     if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
-      l->state = JSON_LST_VALUE;
-      return JSON_INVALID_CHAR;
+      l->state = SJP_LST_VALUE;
+      return SJP_INVALID_CHAR;
     }
 
     if (ch == '"') {
-      l->state = JSON_LST_VALUE;
+      l->state = SJP_LST_VALUE;
       tok->value = &l->data[off0];
       tok->n = outInd - off0;
-      return JSON_OK;
+      return SJP_OK;
     }
 
     // control characters aren't allowed.  RFC 7159 defines them
     // as U+0000 to U+001F
     if (ch < 0x1f) {
-      l->state = JSON_LST_VALUE;
-      return JSON_INVALID_CHAR;
+      l->state = SJP_LST_VALUE;
+      return SJP_INVALID_CHAR;
     }
 
     if (ch != '\\') {
@@ -347,12 +347,12 @@ read_esc:
     ch = jl_getc(l);
     switch (ch) {
       case EOF:
-        l->state = JSON_LST_STR_ESC1;
+        l->state = SJP_LST_STR_ESC1;
         goto partial;
 
       default:
-        l->state = JSON_LST_VALUE;
-        return JSON_INVALID_ESCAPE;
+        l->state = SJP_LST_VALUE;
+        return SJP_INVALID_ESCAPE;
 
       case '"': case '\\': case '/':
         l->data[outInd++] = ch;
@@ -387,56 +387,56 @@ read_esc:
 
 read_udig1:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_ESC2;
+          l->state = SJP_LST_STR_ESC2;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[0] = ch;
 
 read_udig2:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_ESC3;
+          l->state = SJP_LST_STR_ESC3;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[1] = ch;  // in case of restart
 
 read_udig3:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_ESC4;
+          l->state = SJP_LST_STR_ESC4;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[2] = ch;  // in case of restart
 
 read_udig4:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_ESC5;
+          l->state = SJP_LST_STR_ESC5;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[3] = ch;  // in case of restart
@@ -453,82 +453,82 @@ read_udig4:
 
 read_pair0:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR0;
+          l->state = SJP_LST_STR_PAIR0;
           goto partial;
         }
 
         // TODO - optionally allow invalid U+DCXX sequences
         // if the next character isn't a '\'
         if (ch != '\\') {
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_U16PAIR;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_U16PAIR;
         }
 
 read_pair1:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR1;
+          l->state = SJP_LST_STR_PAIR1;
           goto partial;
         }
 
         // TODO - optionally allow invalid U+DCXX sequences
         // if the next character is a valid escape character
         if (ch != 'u') {
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_U16PAIR;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_U16PAIR;
         }
 
 read_pair2:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR2;
+          l->state = SJP_LST_STR_PAIR2;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[4] = ch;  // in case of restart
 
 read_pair3:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR3;
+          l->state = SJP_LST_STR_PAIR3;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[5] = ch;  // in case of restart
 
 read_pair4:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR4;
+          l->state = SJP_LST_STR_PAIR4;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[6] = ch;  // in case of restart
 
 read_pair5:
         if (ch = jl_getc(l), ch == EOF) {
-          l->state = JSON_LST_STR_PAIR5;
+          l->state = SJP_LST_STR_PAIR5;
           goto partial;
         }
 
         if (hexdig = tohex(ch), hexdig < 0) {
           // jl_ungetc(l, ch);
-          l->state = JSON_LST_VALUE;
-          return JSON_INVALID_ESCAPE;
+          l->state = SJP_LST_VALUE;
+          return SJP_INVALID_ESCAPE;
         }
 
         l->buf[7] = ch;  // in case of restart
@@ -552,8 +552,8 @@ encode_utf8:
             assert(outInd == off0);
             tok->value = &l->buf[0];
             tok->n = nb;
-            l->state = JSON_LST_STR;
-            return JSON_PARTIAL;
+            l->state = SJP_LST_STR;
+            return SJP_PARTIAL;
           }
 
           // otherwise keep going...
@@ -571,45 +571,45 @@ encode_utf8:
 partial:
   tok->value = &l->data[off0];
   tok->n = outInd - off0;
-  return JSON_MORE;
+  return SJP_MORE;
 }
 
-static int parse_num(struct json_lexer *l, struct json_token *tok)
+static int parse_num(struct sjp_lexer *l, struct sjp_token *tok)
 {
   size_t off0;
   int ch;
 
   off0 = l->off;
-  tok->type = JSON_TOK_NUMBER;
+  tok->type = SJP_TOK_NUMBER;
   tok->value = &l->data[off0];
 
   // ch = jl_getc(l);
   switch (l->state) {
-    case JSON_LST_VALUE:
+    case SJP_LST_VALUE:
       ch = jl_getc(l);
       break;
 
     // restarts after reading:
-    case JSON_LST_NUM_NEG:
+    case SJP_LST_NUM_NEG:
       ch = jl_getc(l);
       goto st_neg;   // leading '-'
 
-    case JSON_LST_NUM_DIG0: goto st_dig0; // leading '0'
-    case JSON_LST_NUM_DIG:  goto st_dig;  // leading '1' .. '9'
-    case JSON_LST_NUM_DOT:  goto st_dot;  // decimal dot '.'
-    case JSON_LST_NUM_DIGF: goto st_digf; // '0' .. '9' after '.'
-    case JSON_LST_NUM_EXP:  goto st_exp;  // 'e' or 'E'
-    case JSON_LST_NUM_ESGN:
+    case SJP_LST_NUM_DIG0: goto st_dig0; // leading '0'
+    case SJP_LST_NUM_DIG:  goto st_dig;  // leading '1' .. '9'
+    case SJP_LST_NUM_DOT:  goto st_dot;  // decimal dot '.'
+    case SJP_LST_NUM_DIGF: goto st_digf; // '0' .. '9' after '.'
+    case SJP_LST_NUM_EXP:  goto st_exp;  // 'e' or 'E'
+    case SJP_LST_NUM_ESGN:
       ch = jl_getc(l);
       goto st_esign; // '+' or '-' after e/E
-    case JSON_LST_NUM_EDIG: goto st_edig; // exponent digit
+    case SJP_LST_NUM_EDIG: goto st_edig; // exponent digit
 
     default:
-      return JSON_INTERNAL_ERROR; // should never reach here!
+      return SJP_INTERNAL_ERROR; // should never reach here!
   }
 
   if (ch == '-') {
-    l->state = JSON_LST_NUM_NEG;
+    l->state = SJP_LST_NUM_NEG;
     ch = jl_getc(l);
   }
 
@@ -627,7 +627,7 @@ st_neg:
   }
 
 st_dig:
-  l->state = JSON_LST_NUM_DIG;
+  l->state = SJP_LST_NUM_DIG;
   for(;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -649,7 +649,7 @@ st_dig:
   }
 
 st_dig0:
-  l->state = JSON_LST_NUM_DIG0;
+  l->state = SJP_LST_NUM_DIG0;
   ch = jl_getc(l);
   if (ch == EOF) {
     goto more;
@@ -673,7 +673,7 @@ st_dig0:
   goto finish;
 
 st_dot:
-  l->state = JSON_LST_NUM_DOT;
+  l->state = SJP_LST_NUM_DOT;
   ch = jl_getc(l);
   if (ch == EOF) {
     goto more;
@@ -685,7 +685,7 @@ st_dot:
   }
 
 st_digf:
-  l->state = JSON_LST_NUM_DIGF;
+  l->state = SJP_LST_NUM_DIGF;
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -703,11 +703,11 @@ st_digf:
   }
 
 st_exp:
-  l->state = JSON_LST_NUM_EXP;
+  l->state = SJP_LST_NUM_EXP;
   ch = jl_getc(l);
 
   if (ch == '-' || ch == '+') {
-    l->state = JSON_LST_NUM_ESGN;
+    l->state = SJP_LST_NUM_ESGN;
     ch = jl_getc(l);
   }
 
@@ -721,7 +721,7 @@ st_esign:
   }
 
 st_edig:
-  l->state = JSON_LST_NUM_EDIG;
+  l->state = SJP_LST_NUM_EDIG;
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
@@ -736,25 +736,25 @@ st_edig:
 
 more:
   tok->n = l->off - off0;
-  return JSON_MORE;
+  return SJP_MORE;
 
 finish:
-  l->state = JSON_LST_VALUE;
+  l->state = SJP_LST_VALUE;
   tok->n = l->off - off0;
-  return JSON_OK;
+  return SJP_OK;
 
 invalid:
-  l->state = JSON_LST_VALUE;
+  l->state = SJP_LST_VALUE;
   tok->n = l->off - off0;
-  return JSON_INVALID_INPUT;
+  return SJP_INVALID_INPUT;
 }
 
-static int parse_value(struct json_lexer *l, struct json_token *tok)
+static int parse_value(struct sjp_lexer *l, struct sjp_token *tok)
 {
   int ch;
 
   // skip whitespace
-  tok->type = JSON_TOK_NONE;
+  tok->type = SJP_TOK_NONE;
   tok->value = NULL;
 
   // Skip whitespace
@@ -775,7 +775,7 @@ static int parse_value(struct json_lexer *l, struct json_token *tok)
   }
 
   if (l->off >= l->sz) {
-    return JSON_MORE;
+    return SJP_MORE;
   }
 
   ch = l->data[l->off];
@@ -785,7 +785,7 @@ static int parse_value(struct json_lexer *l, struct json_token *tok)
       tok->value = &l->data[l->off];
       tok->n = 1;
       l->off++;
-      return JSON_OK;
+      return SJP_OK;
 
     case '"':
       // strip off the first character...
@@ -805,51 +805,51 @@ static int parse_value(struct json_lexer *l, struct json_token *tok)
 // Returns the next token or partial token
 //
 // If the return is a partial token, the buffer is exhausted.  If the
-// token type is not JSON_TOK_NONE, the lexer expects a partial token
-int json_lexer_token(struct json_lexer *l, struct json_token *tok)
+// token type is not SJP_TOK_NONE, the lexer expects a partial token
+int sjp_lexer_token(struct sjp_lexer *l, struct sjp_token *tok)
 {
   switch (l->state) {
-  case JSON_LST_VALUE:
+  case SJP_LST_VALUE:
     return parse_value(l,tok);
 
-  case JSON_LST_KEYWORD:
+  case SJP_LST_KEYWORD:
     return parse_kw(l,tok);
 
-  case JSON_LST_STR:
-  case JSON_LST_STR_ESC1:
-  case JSON_LST_STR_ESC2:
-  case JSON_LST_STR_ESC3:
-  case JSON_LST_STR_ESC4:
-  case JSON_LST_STR_ESC5:
-  case JSON_LST_STR_PAIR0:
-  case JSON_LST_STR_PAIR1:
-  case JSON_LST_STR_PAIR2:
-  case JSON_LST_STR_PAIR3:
-  case JSON_LST_STR_PAIR4:
-  case JSON_LST_STR_PAIR5:
+  case SJP_LST_STR:
+  case SJP_LST_STR_ESC1:
+  case SJP_LST_STR_ESC2:
+  case SJP_LST_STR_ESC3:
+  case SJP_LST_STR_ESC4:
+  case SJP_LST_STR_ESC5:
+  case SJP_LST_STR_PAIR0:
+  case SJP_LST_STR_PAIR1:
+  case SJP_LST_STR_PAIR2:
+  case SJP_LST_STR_PAIR3:
+  case SJP_LST_STR_PAIR4:
+  case SJP_LST_STR_PAIR5:
     return parse_str(l,tok);
 
-  case JSON_LST_NUM_NEG:
-  case JSON_LST_NUM_DIG0:
-  case JSON_LST_NUM_DIG:
-  case JSON_LST_NUM_DOT:
-  case JSON_LST_NUM_DIGF:
-  case JSON_LST_NUM_EXP:
-  case JSON_LST_NUM_ESGN:
-  case JSON_LST_NUM_EDIG:
+  case SJP_LST_NUM_NEG:
+  case SJP_LST_NUM_DIG0:
+  case SJP_LST_NUM_DIG:
+  case SJP_LST_NUM_DOT:
+  case SJP_LST_NUM_DIGF:
+  case SJP_LST_NUM_EXP:
+  case SJP_LST_NUM_ESGN:
+  case SJP_LST_NUM_EDIG:
     return parse_num(l,tok);
 
   default:
-    return JSON_INTERNAL_ERROR;
+    return SJP_INTERNAL_ERROR;
   }
 } 
 
-int json_lexer_close(struct json_lexer *l)
+int sjp_lexer_close(struct sjp_lexer *l)
 {
-  if (l->state != JSON_LST_VALUE) {
-    l->state = JSON_LST_VALUE;
-    return JSON_UNFINISHED_INPUT;
+  if (l->state != SJP_LST_VALUE) {
+    l->state = SJP_LST_VALUE;
+    return SJP_UNFINISHED_INPUT;
   }
 
-  return JSON_OK;
+  return SJP_OK;
 }

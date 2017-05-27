@@ -8,14 +8,14 @@
 #include <stdlib.h>
 
 #define DEFAULT_STACK 16
-#define DEFAULT_BUF   JSON_PARSER_MIN_BUFFER 
+#define DEFAULT_BUF   SJP_PARSER_MIN_BUFFER 
 
 static int parser_is_sentinel(struct parser_output *out)
 {
-  return out->ret == JSON_OK && out->type == JSON_NONE && out->text == NULL;
+  return out->ret == SJP_OK && out->type == SJP_NONE && out->text == NULL;
 }
 
-static int parser_test_inputs(struct json_parser *p, const char *inputs[], struct parser_output *outputs)
+static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct parser_output *outputs)
 {
   int i, j, more, close;
   char inbuf[2048];
@@ -26,8 +26,8 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
   close=0;
 
   while(1) {
-    enum JSON_RESULT ret;
-    struct json_event evt = {0};
+    enum SJP_RESULT ret;
+    struct sjp_event evt = {0};
     char buf[1024];
     size_t n, outlen;
 
@@ -62,14 +62,14 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
 
       if (close) {
         LOG("[RESET]%s\n","");
-        json_parser_reset(p);
+        sjp_parser_reset(p);
         close=0;
       }
 
       if (inputs[i] != testing_close_marker) {
         snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
         LOG("[MORE] %s\n", inbuf);
-        json_parser_more(p, inbuf, strlen(inbuf));
+        sjp_parser_more(p, inbuf, strlen(inbuf));
       } else {
         close=1;
         LOG("[CLOSE] %s\n", "");
@@ -77,7 +77,7 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
       i++;
     }
 
-    ret = close ? json_parser_close(p) : json_parser_next(p, &evt);
+    ret = close ? sjp_parser_close(p) : sjp_parser_next(p, &evt);
 
     n = evt.n < sizeof buf ? evt.n : sizeof buf-1;
     memset(buf, 0, sizeof buf);
@@ -115,13 +115,13 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
       return -1;
     }
 
-    more = (ret == JSON_MORE) || close;
+    more = (ret == SJP_MORE) || close;
     j++;
   }
 
   if (!close) {
     int ret;
-    if (ret = json_parser_close(p), JSON_ERROR(ret)) {
+    if (ret = sjp_parser_close(p), SJP_ERROR(ret)) {
       return -1;
     }
   }
@@ -132,7 +132,7 @@ static int parser_test_inputs(struct json_parser *p, const char *inputs[], struc
 void run_parser_test(const char *name, size_t nstack, size_t nbuf, const char *inputs[], struct parser_output outputs[])
 {
   int ret;
-  struct json_parser p = { 0 };
+  struct sjp_parser p = { 0 };
   char *stack, *buf;
 
   ntest++;
@@ -145,7 +145,7 @@ void run_parser_test(const char *name, size_t nstack, size_t nbuf, const char *i
     goto failed;
   }
 
-  if (ret = json_parser_init(&p, stack, nstack, buf, nbuf), ret != JSON_OK) {
+  if (ret = sjp_parser_init(&p, stack, nstack, buf, nbuf), ret != SJP_OK) {
     printf("error initializing the parser (ret=%d %s)\n", ret, ret2name(ret));
     goto failed;
   }
@@ -161,7 +161,7 @@ failed:
   printf("FAILED: %s\n", __func__);
 
   if (p.stack != NULL || p.buf != NULL) {
-    json_parser_close(&p);
+    sjp_parser_close(&p);
   }
 
 cleanup:
@@ -179,26 +179,26 @@ void test_simple_objects(void)
   };
 
   struct parser_output outputs[] = {
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_OK, JSON_NUMBER, "2378" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_NUMBER, "2378" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
@@ -214,24 +214,24 @@ void test_simple_arrays(void)
   };
 
   struct parser_output outputs[] = {
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_NUMBER, "2378" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_NUMBER, "2378" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
@@ -247,61 +247,61 @@ void test_nested_arrays_and_objects(void)
   };
 
   struct parser_output outputs[] = {
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
 
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_NUMBER, "123" },
-    { JSON_OK, JSON_NUMBER, "456" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_NUMBER, "123" },
+    { SJP_OK, SJP_NUMBER, "456" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_NUMBER, "123" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_OK, JSON_TRUE, "true" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_NUMBER, "123" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_TRUE, "true" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_OK, JSON_STRING, "quux" },
-    { JSON_OK, JSON_NUMBER, "-23.56e+5" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_STRING, "quux" },
+    { SJP_OK, SJP_NUMBER, "-23.56e+5" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
@@ -323,32 +323,32 @@ void test_restarts_1(void)
   };
 
   struct parser_output outputs[] = {
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
 
-    { JSON_MORE, JSON_NONE, "" },
+    { SJP_MORE, SJP_NONE, "" },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_OBJECT_END, "}" },
-    { JSON_OK, JSON_ARRAY_END, "]" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_OBJECT_END, "}" },
+    { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { JSON_MORE, JSON_NONE, "" },
-
-
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_MORE, JSON_STRING, "some key that" },
-    { JSON_OK, JSON_STRING, "we break" },
-
-    { JSON_MORE, JSON_STRING, "some other key that we" },
-    { JSON_OK, JSON_STRING, "break" },
-
-    { JSON_OK, JSON_STRING, "short key" },
-    { JSON_MORE, JSON_NUMBER, "12345" },
-    { JSON_OK, JSON_NUMBER, ".6789" },
-
-    { JSON_OK, JSON_OBJECT_END, "}" },
+    { SJP_MORE, SJP_NONE, "" },
 
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_MORE, SJP_STRING, "some key that" },
+    { SJP_OK, SJP_STRING, "we break" },
+
+    { SJP_MORE, SJP_STRING, "some other key that we" },
+    { SJP_OK, SJP_STRING, "break" },
+
+    { SJP_OK, SJP_STRING, "short key" },
+    { SJP_MORE, SJP_NUMBER, "12345" },
+    { SJP_OK, SJP_NUMBER, ".6789" },
+
+    { SJP_OK, SJP_OBJECT_END, "}" },
+
+
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
@@ -411,90 +411,90 @@ void test_detect_unclosed_things(void)
 
   struct parser_output outputs[] = {
     // test lexer errors
-    { JSON_MORE, JSON_STRING, "foo" },
-    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+    { SJP_MORE, SJP_STRING, "foo" },
+    { SJP_UNFINISHED_INPUT, SJP_NONE, NULL },
 
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_NONE, NULL },
 
-    { JSON_MORE, JSON_NUMBER, "123.5e" },
-    { JSON_UNFINISHED_INPUT, JSON_NONE, NULL },
+    { SJP_MORE, SJP_NUMBER, "123.5e" },
+    { SJP_UNFINISHED_INPUT, SJP_NONE, NULL },
 
     // test arrays
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_MORE, JSON_NONE, "," },
-    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_MORE, SJP_NONE, "," },
+    { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
     // test objects
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_MORE, JSON_NONE, ":" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_MORE, SJP_NONE, ":" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_MORE, JSON_NONE, "," },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_MORE, SJP_NONE, "," },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
     // test nested things
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_ARRAY_BEG, "{" },
-    { JSON_OK, JSON_NUMBER, "123" },
-    { JSON_MORE, JSON_NONE, "," },
-    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_ARRAY_BEG, "{" },
+    { SJP_OK, SJP_NUMBER, "123" },
+    { SJP_MORE, SJP_NONE, "," },
+    { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_NUMBER, "123" },
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_ARRAY, JSON_NONE, NULL },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_NUMBER, "123" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_ARRAY_BEG, "[" },
-    { JSON_OK, JSON_STRING, "foo" },
-    { JSON_OK, JSON_OBJECT_BEG, "{" },
-    { JSON_OK, JSON_STRING, "bar" },
-    { JSON_OK, JSON_STRING, "baz" },
-    { JSON_MORE, JSON_NONE, "" },
-    { JSON_UNCLOSED_OBJECT, JSON_NONE, NULL },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
+    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
-    { JSON_OK, JSON_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);

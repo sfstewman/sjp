@@ -6,12 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 
-int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer_output *outputs)
+int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_output *outputs)
 {
   int i, j, more, close;
   char inbuf[2048];
 
-  json_lexer_init(lex);
+  sjp_lexer_init(lex);
 
   i=0;
   j=0;
@@ -19,8 +19,8 @@ int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer
   close=0;
 
   while(1) {
-    enum JSON_RESULT ret;
-    struct json_token tok = {0};
+    enum SJP_RESULT ret;
+    struct sjp_token tok = {0};
     char buf[1024];
     size_t n;
 
@@ -48,14 +48,14 @@ int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer
 
       if (close) {
         LOG("[RESET]%s\n","");
-        json_lexer_init(lex);
+        sjp_lexer_init(lex);
         close=0;
       }
 
       if (inputs[i] != testing_close_marker) {
         snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
         LOG("[MORE] %s\n", inbuf);
-        json_lexer_more(lex, inbuf, strlen(inbuf));
+        sjp_lexer_more(lex, inbuf, strlen(inbuf));
       } else {
         close=1;
         LOG("[CLOSE] %s\n", "");
@@ -63,7 +63,7 @@ int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer
       i++;
     }
 
-    ret = close ? json_lexer_close(lex) : json_lexer_token(lex, &tok);
+    ret = close ? sjp_lexer_close(lex) : sjp_lexer_token(lex, &tok);
 
     n = tok.n < sizeof buf ? tok.n : sizeof buf-1;
     memset(buf, 0, sizeof buf);
@@ -99,7 +99,7 @@ int lexer_test_inputs(struct json_lexer *lex, const char *inputs[], struct lexer
       return -1;
     }
 
-    more = (ret == JSON_MORE) || JSON_ERROR(ret) || close;
+    more = (ret == SJP_MORE) || SJP_ERROR(ret) || close;
     j++;
   }
 
@@ -114,24 +114,24 @@ void test_simple_array(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, '['        , "["     },
-    { JSON_OK, JSON_TOK_TRUE  , "true"  },
-    { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_TOK_FALSE , "false" },
-    { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_TOK_NULL  , "null"  },
-    { JSON_OK, ','        , ","     },
-    { JSON_OK, JSON_TOK_STRING, "foo"   },
-    { JSON_OK, ']'        , "]"     },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, '['        , "["     },
+    { SJP_OK, SJP_TOK_TRUE  , "true"  },
+    { SJP_OK, ','        , ","     },
+    { SJP_OK, SJP_TOK_FALSE , "false" },
+    { SJP_OK, ','        , ","     },
+    { SJP_OK, SJP_TOK_NULL  , "null"  },
+    { SJP_OK, ','        , ","     },
+    { SJP_OK, SJP_TOK_STRING, "foo"   },
+    { SJP_OK, ']'        , "]"     },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -147,32 +147,32 @@ void test_simple_object(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, '{'        , "{"     },
+    { SJP_OK, '{'        , "{"     },
 
-    { JSON_OK, JSON_TOK_STRING, "foo"   },
-    { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_TOK_TRUE  , "true"  },
-    { JSON_OK, ','        , ","     },
+    { SJP_OK, SJP_TOK_STRING, "foo"   },
+    { SJP_OK, ':'        , ":"     },
+    { SJP_OK, SJP_TOK_TRUE  , "true"  },
+    { SJP_OK, ','        , ","     },
 
-    { JSON_OK, JSON_TOK_STRING, "bar"   },
-    { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_TOK_STRING, "baz"   },
-    { JSON_OK, ','        , ","     },
+    { SJP_OK, SJP_TOK_STRING, "bar"   },
+    { SJP_OK, ':'        , ":"     },
+    { SJP_OK, SJP_TOK_STRING, "baz"   },
+    { SJP_OK, ','        , ","     },
 
-    { JSON_OK, JSON_TOK_STRING, "quux"  },
-    { JSON_OK, ':'        , ":"     },
-    { JSON_OK, JSON_TOK_NULL  , "null"  },
-    { JSON_OK, '}'        , "}"     },
+    { SJP_OK, SJP_TOK_STRING, "quux"  },
+    { SJP_OK, ':'        , ":"     },
+    { SJP_OK, SJP_TOK_NULL  , "null"  },
+    { SJP_OK, '}'        , "}"     },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -192,28 +192,28 @@ void test_string_with_escapes(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, JSON_TOK_STRING, "this string \"has\" double quote escapes" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string \"has\" double quote escapes" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_STRING, "this string has \\ some escape c\bsequences / combinations" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string has \\ some escape c\bsequences / combinations" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_STRING, "this string tests form-feed\fand carriage-return \r\nand newline" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string tests form-feed\fand carriage-return \r\nand newline" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_STRING, "this string tests \ttab" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string tests \ttab" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -244,55 +244,55 @@ void test_simple_restarts(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, '[', "[" },
+    { SJP_OK, '[', "[" },
 
-    { JSON_MORE, JSON_TOK_NONE, "tr" },
-    { JSON_OK, JSON_TOK_TRUE, "true" },
+    { SJP_MORE, SJP_TOK_NONE, "tr" },
+    { SJP_OK, SJP_TOK_TRUE, "true" },
 
-    { JSON_OK, ',', "," },
+    { SJP_OK, ',', "," },
 
-    { JSON_MORE, JSON_TOK_NONE, "n" },
-    { JSON_OK, JSON_TOK_NULL, "null" },
+    { SJP_MORE, SJP_TOK_NONE, "n" },
+    { SJP_OK, SJP_TOK_NULL, "null" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, ',', "," },
+    { SJP_OK, ',', "," },
 
-    { JSON_MORE, JSON_TOK_NONE, "fals" },
-    { JSON_OK, JSON_TOK_FALSE, "false" },
+    { SJP_MORE, SJP_TOK_NONE, "fals" },
+    { SJP_OK, SJP_TOK_FALSE, "false" },
 
-    { JSON_OK, ',', "," },
+    { SJP_OK, ',', "," },
 
-    { JSON_MORE, JSON_TOK_STRING, "some" },
-    { JSON_OK, JSON_TOK_STRING, " string" },
+    { SJP_MORE, SJP_TOK_STRING, "some" },
+    { SJP_OK, SJP_TOK_STRING, " string" },
 
-    { JSON_OK, ',', "," },
+    { SJP_OK, ',', "," },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "tr" },
-    { JSON_MORE, JSON_TOK_NONE, "tru" },
-    { JSON_OK, JSON_TOK_TRUE, "true" },
+    { SJP_MORE, SJP_TOK_NONE, "tr" },
+    { SJP_MORE, SJP_TOK_NONE, "tru" },
+    { SJP_OK, SJP_TOK_TRUE, "true" },
 
-    { JSON_OK, ',', "," },
+    { SJP_OK, ',', "," },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "some " },
-    { JSON_MORE, JSON_TOK_STRING, "other " },
-    { JSON_OK, JSON_TOK_STRING, "string" },
+    { SJP_MORE, SJP_TOK_STRING, "some " },
+    { SJP_MORE, SJP_TOK_STRING, "other " },
+    { SJP_OK, SJP_TOK_STRING, "string" },
 
-    { JSON_OK, ']', "]" },
+    { SJP_OK, ']', "]" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -343,67 +343,67 @@ void test_string_with_restarts_and_escapes(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_MORE, JSON_TOK_STRING, "this set of strings " },
-    { JSON_OK, JSON_TOK_STRING, "\"break\" the escapes" },
+    { SJP_MORE, SJP_TOK_STRING, "this set of strings " },
+    { SJP_OK, SJP_TOK_STRING, "\"break\" the escapes" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "the breaks " },
-    { JSON_MORE, JSON_TOK_STRING, "\nare sometimes for longer " },
-    { JSON_OK, JSON_TOK_STRING, "\\u sequences: " },
+    { SJP_MORE, SJP_TOK_STRING, "the breaks " },
+    { SJP_MORE, SJP_TOK_STRING, "\nare sometimes for longer " },
+    { SJP_OK, SJP_TOK_STRING, "\\u sequences: " },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "like " },
-    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u00fc and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u00fc" },
-    { JSON_OK, JSON_TOK_STRING, "" },
+    { SJP_MORE, SJP_TOK_STRING, "like " },
+    { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u00fc" },
+    { SJP_OK, SJP_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u2318 and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u2318" },
-    { JSON_MORE, JSON_TOK_STRING, " and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u2318" },
-    { JSON_OK, JSON_TOK_STRING, "" },
+    { SJP_MORE, SJP_TOK_STRING, "and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u2318 and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u2318 and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u2318 and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u2318" },
+    { SJP_MORE, SJP_TOK_STRING, " and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u2318" },
+    { SJP_OK, SJP_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u65E5 and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u65E5" },
-    { JSON_MORE, JSON_TOK_STRING, " and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u65E5" },
-    { JSON_OK, JSON_TOK_STRING, "" },
+    { SJP_MORE, SJP_TOK_STRING, "and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u65E5 and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u65E5 and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u65E5 and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u65E5" },
+    { SJP_MORE, SJP_TOK_STRING, " and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u65E5" },
+    { SJP_OK, SJP_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
-    { JSON_MORE, JSON_TOK_STRING, "\u8A9E and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u8A9E" },
-    { JSON_MORE, JSON_TOK_STRING, " and " },
-    { JSON_PARTIAL, JSON_TOK_STRING, "\u8A9E" },
-    { JSON_OK, JSON_TOK_STRING, "" },
+    { SJP_MORE, SJP_TOK_STRING, "and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u8A9E and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u8A9E and " },
+    { SJP_MORE, SJP_TOK_STRING, "\u8A9E and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u8A9E" },
+    { SJP_MORE, SJP_TOK_STRING, " and " },
+    { SJP_PARTIAL, SJP_TOK_STRING, "\u8A9E" },
+    { SJP_OK, SJP_TOK_STRING, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -427,30 +427,30 @@ void test_string_with_surrogate_pairs(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, JSON_TOK_STRING, "this string has a surrogate pair: \xf0\xa0\x88\x93" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_STRING, "this string has a surrogate pair: \xf0\xa0\x88\x93" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this string splits the surrogate pair: " },
-    { JSON_OK, JSON_TOK_STRING, "\xf0\xa0\x88\x93" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this string splits the surrogate pair: " },
+    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "another split " },
-    { JSON_MORE, JSON_TOK_STRING, "" },
-    { JSON_OK, JSON_TOK_STRING, "\xf0\xa0\x88\x93" },
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "another split " },
+    { SJP_MORE, SJP_TOK_STRING, "" },
+    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
     /*
-    { JSON_MORE, JSON_TOK_STRING, "this string splits the surrogate pair: ",
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this string splits the surrogate pair: ",
+    { SJP_MORE, SJP_TOK_NONE, "" },
     */
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -467,26 +467,26 @@ void test_numbers(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_OK, JSON_TOK_NUMBER  , "3" },
-    { JSON_OK, JSON_TOK_NUMBER  , "57" },
-    { JSON_OK, JSON_TOK_NUMBER  , "0.451" },
-    { JSON_OK, JSON_TOK_NUMBER  , "10.2343" },
-    { JSON_OK, JSON_TOK_NUMBER  , "-3.4" },
-    { JSON_OK, JSON_TOK_NUMBER  , "-0.3" },
+    { SJP_OK, SJP_TOK_NUMBER  , "3" },
+    { SJP_OK, SJP_TOK_NUMBER  , "57" },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.451" },
+    { SJP_OK, SJP_TOK_NUMBER  , "10.2343" },
+    { SJP_OK, SJP_TOK_NUMBER  , "-3.4" },
+    { SJP_OK, SJP_TOK_NUMBER  , "-0.3" },
 
-    { JSON_OK, JSON_TOK_NUMBER  , "5.4e-23" },
-    { JSON_OK, JSON_TOK_NUMBER  , "0.93e+7" },
-    { JSON_OK, JSON_TOK_NUMBER  , "7e2" },
+    { SJP_OK, SJP_TOK_NUMBER  , "5.4e-23" },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.93e+7" },
+    { SJP_OK, SJP_TOK_NUMBER  , "7e2" },
 
-    { JSON_MORE, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -510,34 +510,34 @@ void test_number_restarts(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_MORE, JSON_TOK_NUMBER, "3" },
-    { JSON_OK, JSON_TOK_NUMBER  , "456" },
+    { SJP_MORE, SJP_TOK_NUMBER, "3" },
+    { SJP_OK, SJP_TOK_NUMBER  , "456" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "5" },
-    { JSON_OK, JSON_TOK_NUMBER  , ".37" },
+    { SJP_MORE, SJP_TOK_NUMBER, "5" },
+    { SJP_OK, SJP_TOK_NUMBER  , ".37" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
-    { JSON_OK, JSON_TOK_NUMBER  , "+5" },
+    { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
+    { SJP_OK, SJP_TOK_NUMBER  , "+5" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "54.19" },
-    { JSON_OK, JSON_TOK_NUMBER  , "e-16" },
+    { SJP_MORE, SJP_TOK_NUMBER, "54.19" },
+    { SJP_OK, SJP_TOK_NUMBER  , "e-16" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "54.1" },
-    { JSON_OK, JSON_TOK_NUMBER  , "9E07" },
+    { SJP_MORE, SJP_TOK_NUMBER, "54.1" },
+    { SJP_OK, SJP_TOK_NUMBER  , "9E07" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
-    { JSON_OK, JSON_TOK_NUMBER  , "+3" },
+    { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
+    { SJP_OK, SJP_TOK_NUMBER  , "+3" },
 
-    { JSON_MORE, JSON_TOK_NUMBER, "54.19e" },
-    { JSON_OK, JSON_TOK_NUMBER  , "17" },
+    { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
+    { SJP_OK, SJP_TOK_NUMBER  , "17" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -561,22 +561,22 @@ void test_invalid_keywords(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_INVALID_INPUT, JSON_TOK_NONE, "trup" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NONE, "trup" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NONE, "raisin" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NONE, "raisin" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_NONE, "fals" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_NONE, "fals" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -615,38 +615,38 @@ void test_invalid_numbers(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "--" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "--" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "-Q" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "-Q" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "01" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "01" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NONE, "+123" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NONE, "+123" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "1.A" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "1.A" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "12.e" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "12.e" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_INPUT, JSON_TOK_NUMBER, "12ea" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_INPUT, SJP_TOK_NUMBER, "12ea" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NUMBER, "12e1" },
-    { JSON_INVALID_INPUT, JSON_TOK_NONE, ".9" },
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_NUMBER, "12e1" },
+    { SJP_INVALID_INPUT, SJP_TOK_NONE, ".9" },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -682,34 +682,34 @@ void test_unterminated_strings(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with a partial escape" },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_MORE, JSON_TOK_STRING, "this is an unterminated string with only half a surrogate pair " },
-    { JSON_UNFINISHED_INPUT, JSON_TOK_NONE, "" },
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with only half a surrogate pair " },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
@@ -751,40 +751,40 @@ void test_invalid_strings(void)
   };
 
   struct lexer_output outputs[] = {
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_ESCAPE, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_ESCAPE, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_U16PAIR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_U16PAIR, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_CHAR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_CHAR, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_INVALID_CHAR, JSON_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
-    { JSON_OK, JSON_TOK_NONE, "" },
+    { SJP_INVALID_CHAR, SJP_TOK_STRING, "" },  // XXX - should return up to the invalid part of the token
+    { SJP_OK, SJP_TOK_NONE, "" },
 
-    { JSON_OK, JSON_TOK_NONE, NULL }, // end sentinel
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
 
   ntest++;
 
   int ret;
-  struct json_lexer lex = { 0 };
+  struct sjp_lexer lex = { 0 };
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
