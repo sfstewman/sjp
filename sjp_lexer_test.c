@@ -1,7 +1,7 @@
-#include "json_lexer.h"
+#include "sjp_lexer.h"
 
 #define TEST_LOG_LEVEL 0
-#include "json_testing.h"
+#include "sjp_testing.h"
 
 #include <stdio.h>
 #include <string.h>

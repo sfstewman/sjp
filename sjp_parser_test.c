@@ -1,7 +1,7 @@
-#include "json_parser.h"
+#include "sjp_parser.h"
 
 #define TEST_LOG_LEVEL 0
-#include "json_testing.h"
+#include "sjp_testing.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-#include "json_lexer.h"
+#include "sjp_lexer.h"
 
 #include <string.h>
 #include <ctype.h>

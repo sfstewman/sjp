@@ -1,4 +1,4 @@
-#include "json_testing.h"
+#include "sjp_testing.h"
 
 #include <stdio.h>
 #include <string.h>

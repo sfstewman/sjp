@@ -1,4 +1,4 @@
-#include "json_parser.h"
+#include "sjp_parser.h"
 
 #if SJP_DEBUG
 #  define SHOULD_NOT_REACH() abort()

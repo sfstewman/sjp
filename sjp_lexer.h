@@ -1,7 +1,7 @@
 #ifndef SJP_LEXER_H
 #define SJP_LEXER_H
 
-#include "json_common.h"
+#include "sjp_common.h"
 
 #include <stdlib.h>
 

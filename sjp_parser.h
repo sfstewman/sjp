@@ -1,8 +1,8 @@
 #ifndef SJP_PARSER_H
 #define SJP_PARSER_H
 
-#include "json_common.h"
-#include "json_lexer.h"
+#include "sjp_common.h"
+#include "sjp_lexer.h"
 
 #define MODULE_NAME SJP_PARSER
 

@@ -1,8 +1,8 @@
 #ifndef SJP_TESTING_H
 #define SJP_TESTING_H
 
-#include "json_lexer.h"
-#include "json_parser.h"
+#include "sjp_lexer.h"
+#include "sjp_parser.h"
 
 #define MODULE_NAME SJP_TESTING
 
