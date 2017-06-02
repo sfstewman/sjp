@@ -18,7 +18,7 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
   more=1;
   close=0;
 
-  while(1) {
+  for(;;) {
     enum SJP_RESULT ret;
     struct sjp_token tok = {0};
     char buf[1024];

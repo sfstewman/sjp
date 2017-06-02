@@ -69,7 +69,7 @@ struct sjp_parser {
 // returns SJP_INVALID.
 //
 // TODO: allow no buffer to be allocated?
-int sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *vbuf, size_t nbuf);
+enum SJP_RESULT sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf);
 
 // Resets a the parser to its initial state.
 //
@@ -117,13 +117,13 @@ void sjp_parser_more(struct sjp_parser *p, char *data, size_t n);
 // calls to sjp_parser_next().  Note that during partial returns, the
 // event has not been fully parsed, and a subsequent call to
 // sjp_parser_next() may return SJP_INVALID.
-int sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt);
+enum SJP_RESULT sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt);
 
 // Closes the parser.  If the parser is not in a state that's valid to
 // close, returns an error.
 //
 // The caller is responsible for free'ing any allocated buffers.
-int sjp_parser_close(struct sjp_parser *p);
+enum SJP_RESULT sjp_parser_close(struct sjp_parser *p);
 
 
 #undef MODULE_NAME

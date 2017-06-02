@@ -20,7 +20,7 @@ void sjp_parser_reset(struct sjp_parser *p)
   p->off = 0;
 }
 
-int sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
+enum SJP_RESULT sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
 {
   if (nstack < SJP_PARSER_MIN_STACK || nbuf < SJP_PARSER_MIN_BUFFER) {
     return SJP_INVALID_PARAMS;
@@ -112,7 +112,7 @@ static int parse_value(struct sjp_parser *p, struct sjp_event *evt, int ret, str
   return ret;
 }
 
-int sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt)
+enum SJP_RESULT sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt)
 {
   struct sjp_token tok = {0};
   int st,ret;
@@ -280,7 +280,7 @@ void sjp_parser_more(struct sjp_parser *p, char *data, size_t n)
   sjp_lexer_more(&p->lex, data, n);
 }
 
-int sjp_parser_close(struct sjp_parser *p)
+enum SJP_RESULT sjp_parser_close(struct sjp_parser *p)
 {
   int ret;
   if (ret = sjp_lexer_close(&p->lex), SJP_ERROR(ret)) {

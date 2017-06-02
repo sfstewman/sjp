@@ -45,8 +45,9 @@ enum SJP_LEX_STATE {
   SJP_LST_NUM_EDIG, // read exponent digit
 };
 
-// max supported chars in a number
-#define SJP_LEX_NUM_MAXLEN 32
+// buffer size to allow lexer to restart reading keyword/string/number
+// states
+enum { SJP_LEX_RESTART_SIZE = 32 };
 
 /* Lex JSON tokens.  Makes no attempt to ensure that the JSON has a
  * valid structure, only that its tokens are valid.
@@ -62,7 +63,7 @@ struct sjp_lexer {
   uint32_t u8cp;
 
   // buffer to allow restart during keyword/string/number states
-  char buf[SJP_LEX_NUM_MAXLEN];
+  char buf[SJP_LEX_RESTART_SIZE];
   enum SJP_LEX_STATE state;
 };
 
@@ -101,12 +102,12 @@ void sjp_lexer_more(struct sjp_lexer *l, char *data, size_t n);
 //
 // If the return is a partial token, the buffer is exhausted.  If the
 // token type is not SJP_NONE, the lexer expects a partial token
-int sjp_lexer_token(struct sjp_lexer *l, struct sjp_token *tok);
+enum SJP_RESULT sjp_lexer_token(struct sjp_lexer *l, struct sjp_token *tok);
 
 // Closes the lexer state.  If the lexer is not at a position where it
 // can be stopped (ie: it's waiting on the close " of a string), the
 // lexer returns SJP_INVALID.
-int sjp_lexer_close(struct sjp_lexer *l);
+enum SJP_RESULT sjp_lexer_close(struct sjp_lexer *l);
 
 #undef MODULE_NAME
 
