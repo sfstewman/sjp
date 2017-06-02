@@ -8,7 +8,8 @@
 #include <stdlib.h>
 
 #define DEFAULT_STACK 16
-#define DEFAULT_BUF   SJP_PARSER_MIN_BUFFER 
+#define NO_BUF         0
+#define SMALL_BUF    128
 
 static int parser_is_sentinel(struct parser_output *out)
 {
@@ -138,9 +139,9 @@ void run_parser_test(const char *name, size_t nstack, size_t nbuf, const char *i
   ntest++;
 
   stack = malloc(nstack);
-  buf = malloc(nbuf);
+  buf = (nbuf > 0) ? malloc(nbuf) : NULL;
 
-  if (stack == NULL || buf == NULL) {
+  if (stack == NULL || (nbuf > 0 && buf == NULL)) {
     printf("could not allocate stack  of %zu bytes or buffer of %zu bytes\n", nstack,nbuf);
     goto failed;
   }
@@ -158,7 +159,7 @@ void run_parser_test(const char *name, size_t nstack, size_t nbuf, const char *i
 
 failed:
   nfail++;
-  printf("FAILED: %s\n", __func__);
+  printf("FAILED: %s\n", name);
 
   if (p.stack != NULL || p.buf != NULL) {
     sjp_parser_close(&p);
@@ -225,7 +226,7 @@ void test_values(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
 void test_simple_objects(void)
@@ -260,7 +261,7 @@ void test_simple_objects(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
 void test_simple_arrays(void)
@@ -293,7 +294,7 @@ void test_simple_arrays(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
 void test_nested_arrays_and_objects(void)
@@ -363,7 +364,7 @@ void test_nested_arrays_and_objects(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
 void test_restarts_1(void)
@@ -372,9 +373,9 @@ void test_restarts_1(void)
     "[",
     "{} ]",
 
-    "{ \"some key that",
-    "we break\" : \"some other key that we",
-    "break\", \"short key\" : 12345",
+    "{ \"some key that ",
+    "we break\" : \"some other string that we",
+    " break\", \"short key\" : 12345",
     ".6789 }",
 
     // "{ \"foo\" : { \"bar\" : [ 123, { \"baz\" : true } ], \"quux\": -23.56e+5 } }",
@@ -394,11 +395,11 @@ void test_restarts_1(void)
 
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_MORE, SJP_STRING, "some key that" },
+    { SJP_MORE, SJP_STRING, "some key that " },
     { SJP_OK, SJP_STRING, "we break" },
 
-    { SJP_MORE, SJP_STRING, "some other key that we" },
-    { SJP_OK, SJP_STRING, "break" },
+    { SJP_MORE, SJP_STRING, "some other string that we" },
+    { SJP_OK, SJP_STRING, " break" },
 
     { SJP_OK, SJP_STRING, "short key" },
     { SJP_MORE, SJP_NUMBER, "12345" },
@@ -410,7 +411,43 @@ void test_restarts_1(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
+}
+
+void test_buffered_1(void)
+{
+  const char *inputs[] = {
+    "{ \"some key that ",
+    "we break\" : \"some other string that we",
+    " break\", \"short key\" : 12345",
+    ".6789 }",
+
+    // "{ \"foo\" : { \"bar\" : [ 123, { \"baz\" : true } ], \"quux\": -23.56e+5 } }",
+    NULL
+  };
+
+  struct parser_output outputs[] = {
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_MORE, SJP_NONE, "" },
+
+    { SJP_OK, SJP_STRING, "some key that we break" },
+
+    { SJP_MORE, SJP_NONE, "" },
+
+    { SJP_OK, SJP_STRING, "some other string that we break" },
+
+    { SJP_OK, SJP_STRING, "short key" },
+    { SJP_MORE, SJP_NONE, "" },
+
+    { SJP_OK, SJP_NUMBER, "12345.6789" },
+
+    { SJP_OK, SJP_OBJECT_END, "}" },
+
+
+    { SJP_OK, SJP_NONE, NULL }, // end sentinel
+  };
+
+  run_parser_test(__func__, DEFAULT_STACK, SMALL_BUF, inputs, outputs);
 }
 
 void test_detect_unclosed_things(void)
@@ -491,7 +528,7 @@ void test_detect_unclosed_things(void)
 
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_STRING, "foo" },
-    { SJP_MORE, SJP_NONE, "," },
+    { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
     // test objects
@@ -506,7 +543,7 @@ void test_detect_unclosed_things(void)
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
     { SJP_OK, SJP_STRING, "foo" },
-    { SJP_MORE, SJP_NONE, ":" },
+    { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
@@ -518,7 +555,7 @@ void test_detect_unclosed_things(void)
     { SJP_OK, SJP_OBJECT_BEG, "{" },
     { SJP_OK, SJP_STRING, "foo" },
     { SJP_OK, SJP_STRING, "bar" },
-    { SJP_MORE, SJP_NONE, "," },
+    { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_OBJECT, SJP_NONE, NULL },
 
     // test nested things
@@ -526,7 +563,7 @@ void test_detect_unclosed_things(void)
     { SJP_OK, SJP_STRING, "foo" },
     { SJP_OK, SJP_ARRAY_BEG, "{" },
     { SJP_OK, SJP_NUMBER, "123" },
-    { SJP_MORE, SJP_NONE, "," },
+    { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
@@ -556,7 +593,7 @@ void test_detect_unclosed_things(void)
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
-  run_parser_test(__func__, DEFAULT_STACK, DEFAULT_BUF, inputs, outputs);
+  run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
 int main(void)
@@ -566,6 +603,8 @@ int main(void)
   test_simple_arrays();
   test_nested_arrays_and_objects();
   test_restarts_1();
+
+  test_buffered_1();
 
   test_detect_unclosed_things();
 

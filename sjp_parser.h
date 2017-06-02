@@ -47,7 +47,6 @@ struct sjp_event {
 
 enum {
   SJP_PARSER_MIN_STACK  = 16,
-  SJP_PARSER_MIN_BUFFER = 1024,
 };
 
 struct sjp_parser {
@@ -59,16 +58,24 @@ struct sjp_parser {
   size_t off;
   size_t nbuf;
 
+  struct sjp_token spill;
+  enum SJP_RESULT rspill;  // return value of spilled call
+  int has_spilled;
+
   struct sjp_lexer lex;
 };
 
 // Initializes the parser state.  The parser has both a stack and a
 // value buffer.
 //
-// In nstack < SJP_PARSER_MIN_STACK or nbuf < SJP_PARSER_MIN_BUFFER,
-// returns SJP_INVALID.
+// Returns SJP_OK on success.
 //
-// TODO: allow no buffer to be allocated?
+// Returns SJP_INVALID_PARAMS if:
+//   stack == NULL or nstack < SJP_PARSER_MIN_STACK
+// or if:
+//   nbuf > 0 and (buf == NULL or nbuf <= SJP_LEX_RESTART_SIZE)
+//
+// If nbuf == 0, buf must be NULL and the lexer is not buffered.
 enum SJP_RESULT sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf);
 
 // Resets a the parser to its initial state.

@@ -1,5 +1,8 @@
 #include "sjp_parser.h"
 
+#include <assert.h>
+#include <string.h>
+
 #if SJP_DEBUG
 #  define SHOULD_NOT_REACH() abort()
 #else
@@ -14,19 +17,28 @@ static void jp_setstate(struct sjp_parser *p, enum SJP_PARSER_STATE st);
 
 void sjp_parser_reset(struct sjp_parser *p)
 {
+  struct sjp_token zero_tok = { 0 };
   sjp_lexer_init(&p->lex);
   p->top = 0;
   jp_pushstate(p,SJP_PARSER_VALUE);
   p->off = 0;
+
+  p->spill = zero_tok;
+  p->rspill = 0;
+  p->has_spilled = 0;
 }
 
 enum SJP_RESULT sjp_parser_init(struct sjp_parser *p, char *stack, size_t nstack, char *buf, size_t nbuf)
 {
-  if (nstack < SJP_PARSER_MIN_STACK || nbuf < SJP_PARSER_MIN_BUFFER) {
+  if (nstack < SJP_PARSER_MIN_STACK || stack == NULL) {
     return SJP_INVALID_PARAMS;
   }
 
-  if (stack == NULL || buf == NULL) {
+  if (nbuf > 0 && buf == NULL) {
+    return SJP_INVALID_PARAMS;
+  }
+
+  if (nbuf > 0 && nbuf <= SJP_LEX_RESTART_SIZE) {
     return SJP_INVALID_PARAMS;
   }
 
@@ -112,12 +124,160 @@ static int parse_value(struct sjp_parser *p, struct sjp_event *evt, int ret, str
   return ret;
 }
 
+// Fills buffer with data from token, updates buffer offset
+// and token.
+//
+// Returns 0 if the buffer could accomodate all of the data, 
+//         1 if not
+static int fillbuf(struct sjp_parser *p, struct sjp_token *tok)
+{
+  size_t nfill = p->nbuf - p->off;
+  if (nfill > tok->n) {
+    nfill = tok->n;
+  }
+  memcpy(&p->buf[p->off], tok->value, nfill);
+  p->off += nfill;
+  tok->value += nfill;
+  tok->n -= nfill;
+  return tok->n > 0;
+}
+
+static void returnbuf(struct sjp_parser *p, struct sjp_token *tok)
+{
+  tok->value = &p->buf[0];
+  tok->n = p->off;
+  p->off = 0;
+}
+
+static enum SJP_RESULT spill(struct sjp_parser *p, struct sjp_token *tok, enum SJP_RESULT ret)
+{
+  assert(p->spill.n == 0);
+  assert(p->spill.value == NULL);
+  assert(p->rspill == 0);
+  assert(tok->n > 0);
+  assert(tok->value != NULL);
+
+  p->spill.n = tok->n;
+  p->spill.value = tok->value;
+  p->rspill = ret;
+  p->has_spilled = 1;
+
+  returnbuf(p,tok);
+
+  return ret;
+}
+
+static enum SJP_RESULT next_token(struct sjp_parser *p, struct sjp_token *tok)
+{
+  enum SJP_RESULT ret;
+
+  // fast exit if we're unbuffered
+  if (p->nbuf == 0) {
+    return sjp_lexer_token(&p->lex, tok);
+  }
+
+next_token:
+  // The parser has a buffer and a marker for spilled data.  Data is
+  // spilled when we have some buffered data and the next token would
+  // overrun our buffer.  In this case, we save the spilled data and
+  // return the buffered data.
+  //
+  // If we have spilled data, this is used instead of asking the lexer
+  // for the next token.
+  if (p->spill.n > 0) { // spilled data...
+    *tok = p->spill;
+    ret = p->rspill;
+    p->spill.n = 0;
+    p->spill.value = NULL;
+    p->rspill = 0;
+  } else {
+    // Otherwise ask the lexer for the next token
+    ret = sjp_lexer_token(&p->lex, tok);
+    if (SJP_ERROR(ret)) {
+      return ret;
+    }
+  }
+
+  switch (ret) {
+    case SJP_OK:
+      {
+        // reset spilled state, note that spill() will set the spilled
+        // state again if necessary
+        p->has_spilled = 0;
+
+        // fast exit if buffer is empty
+        if (p->off == 0) {
+          return ret;
+        }
+      }
+      /* fallthrough */
+
+    case SJP_MORE:
+      {
+        // fast exit if (SJP_MORE, SJP_TOK_NONE, *)
+        if (tok->type == SJP_TOK_NONE) {
+          return ret;
+        }
+
+        // Fill buffer from token data.  If the token still has more
+        // data, mark the data as spilled and return the buffer.
+        if (fillbuf(p, tok)) {
+          return spill(p, tok, ret);
+        }
+
+        // No spill.  Return the buffer if:
+        //   1. the buffer is full
+        //   2. ret is SJP_OK
+        //   3. we've already spilled
+        //
+        // XXX - add a high-water mark to try and avoid spilling next
+        // call?
+        if (ret == SJP_OK || p->has_spilled || p->off >= p->nbuf) {
+          returnbuf(p,tok);
+          return ret;
+        }
+
+        // Return (SJP_MORE, SJP_TOK_NONE, "") to request more data...
+        if (ret != SJP_OK && p->off < p->nbuf && !p->has_spilled) {
+          tok->type = SJP_TOK_NONE;
+          tok->value = "";
+          tok->n = 0;
+          return SJP_MORE;
+        }
+      }
+
+    case SJP_PARTIAL:
+      // If return is SJP_PARTIAL:
+      //
+      //   If the data would overflow the buffer, mark the data as spilled
+      //   and return the buffer.  Done.
+      //
+      //   Otherwise, append the data to the buffer, go to state 2.
+      {
+        if (fillbuf(p, tok)) {
+          spill(p, tok, ret);
+          return SJP_MORE;
+        }
+
+        // if we didn't spill, request more from the lexer
+        goto next_token;
+      }
+
+    default:
+      SHOULD_NOT_REACH();
+      return SJP_INTERNAL_ERROR;
+  }
+}
+
 enum SJP_RESULT sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt)
 {
   struct sjp_token tok = {0};
   int st,ret;
 
 restart:
+  evt->text = NULL;
+  evt->n =0;
+
   // XXX - stream of values?
   if (p->top == 0) {
     // TODO: this was initially meant to close the stream of input after
@@ -128,7 +288,7 @@ restart:
 
   st = jp_getstate(p);
 
-  if (ret = sjp_lexer_token(&p->lex, &tok), SJP_ERROR(ret)) {
+  if (ret = next_token(p, &tok), SJP_ERROR(ret)) {
     return ret;
   }
 
