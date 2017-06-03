@@ -1074,6 +1074,80 @@ void test_invalid_strings(void)
   }
 }
 
+void test_nested_arrays_and_objects(void)
+{
+  const char *inputs[] = {
+    "[ {}, [], [ {} ] ]",
+    "[ { \"foo\" : \"bar\", \"baz\" : [ 123, 456 ]} ]",
+    "{ \"foo\" : { \"bar\" : [ 123, { \"baz\" : true } ], \"quux\": -23.56e+5 } }",
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { SJP_OK, '[' , "[" },
+        { SJP_OK, '{', "{" }, { SJP_OK, '}', "}" },
+    { SJP_OK, ',', "," },
+        { SJP_OK, '[', "[" }, { SJP_OK, ']', "]" },
+    { SJP_OK, ',', "," },
+        { SJP_OK, '[', "[" },
+                { SJP_OK, '{', "{" },
+                { SJP_OK, '}', "}" },
+        { SJP_OK, ']', "]" },
+    { SJP_OK, ']', "]" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, '[', "[" },
+        { SJP_OK, '{', "{" },
+                { SJP_OK, SJP_TOK_STRING, "foo" }, { SJP_OK, ':', ":" }, { SJP_OK, SJP_TOK_STRING, "bar" },
+        { SJP_OK, ',', "," },
+                { SJP_OK, SJP_TOK_STRING, "baz"},
+                { SJP_OK, ':', ":" },
+                { SJP_OK, '[', "[" },
+                        { SJP_OK, SJP_TOK_NUMBER, "123", 1, 123},
+                        { SJP_OK, ',', "," },
+                        { SJP_OK, SJP_TOK_NUMBER, "456", 1, 456}, 
+                { SJP_OK, ']', "]" },
+        { SJP_OK, '}', "}" },
+    { SJP_OK, ']', "]" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, '{', "{" },
+        { SJP_OK, SJP_TOK_STRING, "foo" },
+        { SJP_OK, ':', ":" },
+        { SJP_OK, '{', "{" },
+                { SJP_OK, SJP_TOK_STRING, "bar" },
+                { SJP_OK, ':', ":" },
+                { SJP_OK, '[', "[" },
+                        { SJP_OK, SJP_TOK_NUMBER, "123", 1, 123},
+                        { SJP_OK, ',', "," },
+                        { SJP_OK, '{', "{" },
+                                { SJP_OK, SJP_TOK_STRING, "baz"},
+                                { SJP_OK, ':', ":" },
+                                { SJP_OK, SJP_TOK_TRUE, "true" },
+                        { SJP_OK, '}', "}" },
+                { SJP_OK, ']', "]" },
+        { SJP_OK, ',', "," },
+                { SJP_OK, SJP_TOK_STRING, "quux" },
+                { SJP_OK, ':', ":" },
+                { SJP_OK, SJP_TOK_NUMBER, "-23.56e+5", 1, -23.56e5 },
+        { SJP_OK, '}', "}" },
+    { SJP_OK, '}', "}" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct sjp_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
 int main(void)
 {
   test_simple_array();
@@ -1094,6 +1168,7 @@ int main(void)
   test_unterminated_strings();
 
   test_invalid_strings();
+  test_nested_arrays_and_objects();
 
   printf("%d tests, %d failures\n", ntest,nfail);
   return nfail == 0 ? 0 : 1;
