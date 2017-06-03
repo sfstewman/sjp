@@ -604,6 +604,7 @@ static int parse_num(struct sjp_lexer *l, struct sjp_token *tok)
   // ch = jl_getc(l);
   switch (l->state) {
     case SJP_LST_VALUE:
+      l->buf[0] = 1; // offset in buffer
       ch = jl_getc(l);
       break;
 
@@ -771,13 +772,51 @@ st_edig:
   }
 
 more:
-  tok->n = l->off - off0;
-  return SJP_MORE;
+  {
+    int n;
+
+    tok->n = l->off - off0;
+    n = sizeof l->buf - l->buf[0];
+    if (n >= tok->n) {
+      n = tok->n;
+    }
+
+    if (n > 0) {
+      int off = l->buf[0];
+      memcpy(&l->buf[off], tok->value, n);
+      l->buf[0] = off + n;
+    }
+    return SJP_MORE;
+  }
 
 finish:
-  l->state = SJP_LST_VALUE;
-  tok->n = l->off - off0;
-  return SJP_OK;
+  {
+    int n;
+
+    l->state = SJP_LST_VALUE;
+    tok->n = l->off - off0;
+    n = sizeof l->buf - l->buf[0];
+    if (n >= tok->n) {
+      n = tok->n;
+    }
+
+    if (n > 0) {
+      int off = l->buf[0];
+      memcpy(&l->buf[off], tok->value, n);
+      l->buf[0] = off + n;
+    }
+
+    if (l->buf[0] < sizeof l->buf) {
+      char *ep= NULL;
+      int ind = l->buf[0];
+
+      l->buf[ind] = '\0';
+      tok->dbl = strtod(&l->buf[1], &ep);
+      // XXX - handle overflow, underflow cases?
+      assert(ep && *ep == '\0');
+    }
+    return SJP_OK;
+  }
 
 invalid:
   l->state = SJP_LST_VALUE;

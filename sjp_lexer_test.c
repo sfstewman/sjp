@@ -1,6 +1,6 @@
 #include "sjp_lexer.h"
 
-#define TEST_LOG_LEVEL 1
+#define TEST_LOG_LEVEL 0
 #include "sjp_testing.h"
 
 #include <stdio.h>
@@ -107,6 +107,13 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
     } else {
       if (tok.n != 0) {
         printf("i=%d, j=%d, expected value <null> but found '%s'\n", i,j, buf);
+        return -1;
+      }
+    }
+
+    if (outputs[j].checknum) {
+      if (tok.dbl != outputs[j].num) {
+        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, tok.dbl);
         return -1;
       }
     }
@@ -498,16 +505,16 @@ void test_numbers(void)
   };
 
   struct lexer_output outputs[] = {
-    { SJP_OK, SJP_TOK_NUMBER  , "3" },
-    { SJP_OK, SJP_TOK_NUMBER  , "57" },
-    { SJP_OK, SJP_TOK_NUMBER  , "0.451" },
-    { SJP_OK, SJP_TOK_NUMBER  , "10.2343" },
-    { SJP_OK, SJP_TOK_NUMBER  , "-3.4" },
-    { SJP_OK, SJP_TOK_NUMBER  , "-0.3" },
+    { SJP_OK, SJP_TOK_NUMBER  , "3",       1, 3 },
+    { SJP_OK, SJP_TOK_NUMBER  , "57",      1, 57 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.451",   1, 0.451 },
+    { SJP_OK, SJP_TOK_NUMBER  , "10.2343", 1, 10.2343 },
+    { SJP_OK, SJP_TOK_NUMBER  , "-3.4",    1, -3.4 },
+    { SJP_OK, SJP_TOK_NUMBER  , "-0.3",    1, -0.3 },
 
-    { SJP_OK, SJP_TOK_NUMBER  , "5.4e-23" },
-    { SJP_OK, SJP_TOK_NUMBER  , "0.93e+7" },
-    { SJP_OK, SJP_TOK_NUMBER  , "7e2" },
+    { SJP_OK, SJP_TOK_NUMBER  , "5.4e-23", 1, 5.4e-23 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.93e+7", 1, 0.93e7 },
+    { SJP_OK, SJP_TOK_NUMBER  , "7e2",     1, 7e2 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_NONE, "" },
@@ -593,25 +600,25 @@ void test_number_restarts(void)
 
   struct lexer_output outputs[] = {
     { SJP_MORE, SJP_TOK_NUMBER, "3" },
-    { SJP_OK, SJP_TOK_NUMBER  , "456" },
+    { SJP_OK, SJP_TOK_NUMBER  , "456", 1, 3456 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "5" },
-    { SJP_OK, SJP_TOK_NUMBER  , ".37" },
+    { SJP_OK, SJP_TOK_NUMBER  , ".37", 1, 5.37 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "+5" },
+    { SJP_OK, SJP_TOK_NUMBER  , "+5", 1, 54.19e5 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19" },
-    { SJP_OK, SJP_TOK_NUMBER  , "e-16" },
+    { SJP_OK, SJP_TOK_NUMBER  , "e-16", 1, 54.19e-16 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.1" },
-    { SJP_OK, SJP_TOK_NUMBER  , "9E07" },
+    { SJP_OK, SJP_TOK_NUMBER  , "9E07", 1, 54.19e7 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "+3" },
+    { SJP_OK, SJP_TOK_NUMBER  , "+3", 1, 54.19e3 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "17" },
+    { SJP_OK, SJP_TOK_NUMBER  , "17", 1, 54.19e17 },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };

@@ -45,8 +45,33 @@ enum SJP_LEX_STATE {
   SJP_LST_NUM_EDIG, // read exponent digit
 };
 
-// buffer size to allow lexer to restart reading keyword/string/number
-// states
+// Buffer size to allow lexer to restart reading keyword/string/number
+// states.
+//
+// Keywords are 'true', 'false', and 'null', which in utf8 require 4 or
+// 5 bytes.
+//
+// Strings only need a restart buffer for the \uXYZW escape sequence,
+// which only requires 4 bytes of storage.
+//
+// Numbers, on the other hand, require more.  This buffer should allow
+// us to parse either uint64_t, int64_t or double.
+//
+// For uint64_t: 64 bits, so 64 / log2(10) = 19.3, so 20 digits
+// For int64_t:  63 bits, so 63 / log2(10) = 19.0, plus a sign, so 20
+//               digits
+//
+// For double:   53 bits in the significand, a sign, a decimal point,
+//               and an exponent.
+//
+//   significand: 53 / log2(10) = 15.9, or 16 digits
+//   sign:        one digit
+//   exponent:    range is -1023 to 1024 plus 'e', so 6 chars
+//
+//   This gives 16 + 1 + 6 = 23.
+//
+// Round up to the nearest (small) power of two to offer some padding,
+// especially for double numbers where people do odd things.
 enum { SJP_LEX_RESTART_SIZE = 32 };
 
 /* Lex JSON tokens.  Makes no attempt to ensure that the JSON has a
@@ -88,6 +113,7 @@ enum SJP_TOKEN {
 struct sjp_token {
   size_t n;
   const char *value;
+  double dbl;
   enum SJP_TOKEN type;
 };
 
