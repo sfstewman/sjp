@@ -165,6 +165,12 @@ void test_simple_object(void)
   const char *inputs[] = {
     "{ \"foo\" : true, \"bar\" : \"baz\", \"quux\" : null }",
     testing_end_of_stream,
+    testing_close_marker,
+
+    "{\n\"hello\" : 0\n}",
+    testing_end_of_stream,
+    testing_close_marker,
+
     NULL
   };
 
@@ -188,6 +194,18 @@ void test_simple_object(void)
 
     { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_EOS, NULL },
+    { SJP_OK, SJP_TOK_NONE, "" }, // close
+
+
+    { SJP_OK, '{'        , "{"     },
+    { SJP_OK, SJP_TOK_STRING, "hello"   },
+    { SJP_OK, ':'        , ":"     },
+    { SJP_OK, SJP_TOK_NUMBER, "0", 1, 0  },
+    { SJP_OK, '}'        , "}"     },
+
+    { SJP_MORE, SJP_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_EOS, NULL },
+    { SJP_OK, SJP_TOK_NONE, "" }, // close
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
@@ -484,7 +502,7 @@ void test_string_with_surrogate_pairs(void)
 void test_numbers(void)
 {
   const char *inputs[] = {
-    "3 57 0.451 10.2343 -3.4 -0.3 5.4e-23 0.93e+7 7e2 ",
+    "3 57 0 0.451 10.2343 -3.4 -0.3 5.4e-23 0.93e+7 7e2 ",
     testing_close_marker,
 
     "3",
@@ -509,6 +527,7 @@ void test_numbers(void)
   struct lexer_output outputs[] = {
     { SJP_OK, SJP_TOK_NUMBER  , "3",       1, 3 },
     { SJP_OK, SJP_TOK_NUMBER  , "57",      1, 57 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0",       1, 0 },
     { SJP_OK, SJP_TOK_NUMBER  , "0.451",   1, 0.451 },
     { SJP_OK, SJP_TOK_NUMBER  , "10.2343", 1, 10.2343 },
     { SJP_OK, SJP_TOK_NUMBER  , "-3.4",    1, -3.4 },

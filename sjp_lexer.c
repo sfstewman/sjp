@@ -689,7 +689,7 @@ st_dig0:
   }
 
   // numbers cannot have leading zeros
-  if (ch >= '1' || ch <= '9') {
+  if (ch >= '1' && ch <= '9') {
     goto invalid;
   }
 
