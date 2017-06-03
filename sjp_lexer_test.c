@@ -53,6 +53,8 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
         close=0;
       }
 
+      eos=0;
+
       if (inputs[i] == testing_close_marker) {
         close=1;
         LOG("[CLOSE] %s\n", "");
@@ -728,6 +730,7 @@ void test_invalid_keywords(void)
     { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
 
     { SJP_OK, SJP_TOK_TRUE, "true" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_EOS, "" },
     { SJP_OK, SJP_TOK_NONE, "" },
 
@@ -749,6 +752,7 @@ void test_invalid_keywords(void)
     { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
 
     { SJP_OK, SJP_TOK_FALSE, "false" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_EOS, "" },
     { SJP_OK, SJP_TOK_NONE, "" },
 
@@ -766,6 +770,7 @@ void test_invalid_keywords(void)
     { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
 
     { SJP_OK, SJP_TOK_NULL, "null" },
+    { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_EOS, "" },
     { SJP_OK, SJP_TOK_NONE, "" },
 
