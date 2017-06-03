@@ -81,6 +81,8 @@ enum SJP_TOKEN {
   SJP_TOK_CBRACKET = ']',
   SJP_TOK_COMMA    = ',',
   SJP_TOK_COLON    = ':',
+
+  SJP_TOK_EOS      = 0xff,
 };
 
 struct sjp_token {
@@ -97,6 +99,12 @@ void sjp_lexer_init(struct sjp_lexer *l);
 //
 // The caller may pass the same data buffer to the lexer.
 void sjp_lexer_more(struct sjp_lexer *l, char *data, size_t n);
+
+// Tells the lexer that we've reached the end of the stream.
+static inline void sjp_lexer_eos(struct sjp_lexer *l)
+{
+  sjp_lexer_more(l, NULL, 0);
+}
 
 // Returns the next token or partial token
 //

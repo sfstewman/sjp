@@ -1,6 +1,6 @@
 #include "sjp_lexer.h"
 
-#define TEST_LOG_LEVEL 0
+#define TEST_LOG_LEVEL 1
 #include "sjp_testing.h"
 
 #include <stdio.h>
@@ -8,7 +8,7 @@
 
 int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_output *outputs)
 {
-  int i, j, more, close;
+  int i, j, more, close, eos;
   char inbuf[2048];
 
   sjp_lexer_init(lex);
@@ -16,6 +16,7 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
   i=0;
   j=0;
   more=1;
+  eos=0;
   close=0;
 
   for(;;) {
@@ -52,13 +53,17 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
         close=0;
       }
 
-      if (inputs[i] != testing_close_marker) {
+      if (inputs[i] == testing_close_marker) {
+        close=1;
+        LOG("[CLOSE] %s\n", "");
+      } else if (inputs[i] == testing_end_of_stream) {
+        eos=1;
+        LOG("[EOS] %s\n", inbuf);
+        sjp_lexer_eos(lex);
+      } else {
         snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
         LOG("[MORE] %s\n", inbuf);
         sjp_lexer_more(lex, inbuf, strlen(inbuf));
-      } else {
-        close=1;
-        LOG("[CLOSE] %s\n", "");
       }
       i++;
     }
@@ -93,13 +98,20 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
       return -1;
     }
 
-    if (tok.n != strlen(outputs[j].value)) {
-      printf("i=%d, j=%d, expected value '%s' but found '%s'\n",
-          i,j, outputs[j].value, buf);
-      return -1;
+    if (outputs[j].value != NULL) {
+      if (tok.n != strlen(outputs[j].value) || memcmp(tok.value,outputs[j].value,tok.n) != 0) {
+        printf("i=%d, j=%d, expected value '%s' but found '%s'\n",
+            i,j, outputs[j].value, buf);
+        return -1;
+      }
+    } else {
+      if (tok.n != 0) {
+        printf("i=%d, j=%d, expected value <null> but found '%s'\n", i,j, buf);
+        return -1;
+      }
     }
 
-    more = (ret == SJP_MORE) || SJP_ERROR(ret) || close;
+    more = (ret == SJP_MORE) || SJP_ERROR(ret) || close || eos;
     j++;
   }
 
@@ -143,6 +155,7 @@ void test_simple_object(void)
 {
   const char *inputs[] = {
     "{ \"foo\" : true, \"bar\" : \"baz\", \"quux\" : null }",
+    testing_end_of_stream,
     NULL
   };
 
@@ -165,6 +178,7 @@ void test_simple_object(void)
     { SJP_OK, '}'        , "}"     },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_EOS, NULL },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
@@ -462,6 +476,23 @@ void test_numbers(void)
 {
   const char *inputs[] = {
     "3 57 0.451 10.2343 -3.4 -0.3 5.4e-23 0.93e+7 7e2 ",
+    testing_close_marker,
+
+    "3",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "3.5",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "-3.5",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "3.592e+3",
+    testing_end_of_stream,
+    testing_close_marker,
 
     NULL
   };
@@ -479,6 +510,24 @@ void test_numbers(void)
     { SJP_OK, SJP_TOK_NUMBER  , "7e2" },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_MORE, SJP_TOK_NUMBER  , "3" },
+    // { SJP_MORE, SJP_TOK_NUMBER, "" },
+    { SJP_OK, SJP_TOK_NUMBER, "", 1, 3 },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_MORE, SJP_TOK_NUMBER  , "3.5" },
+    { SJP_OK, SJP_TOK_NUMBER, "", 1, 3.5 },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_MORE, SJP_TOK_NUMBER  , "-3.5" },
+    { SJP_OK, SJP_TOK_NUMBER, NULL, 1, -3.5 },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+    { SJP_MORE, SJP_TOK_NUMBER  , "3.592e+3" },
+    { SJP_OK, SJP_TOK_NUMBER, NULL, 1, 3.592e3 },
+    { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
@@ -711,6 +760,35 @@ void test_unterminated_strings(void)
     "\"this is an unterminated string with only half a surrogate pair \\uD840",
     testing_close_marker,
 
+    // same tests but indicate EOS
+    "\"this is an unterminated string",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u1",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u12",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with a partial escape\\u123",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "\"this is an unterminated string with only half a surrogate pair \\uD840",
+    testing_end_of_stream,
+    testing_close_marker,
+
     NULL
   };
 
@@ -735,6 +813,35 @@ void test_unterminated_strings(void)
 
     { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with only half a surrogate pair " },
     { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
+
+    // same tests but indicate EOS
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with a partial escape" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_STRING, "this is an unterminated string with only half a surrogate pair " },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_STRING, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };

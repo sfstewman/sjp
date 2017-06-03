@@ -9,11 +9,16 @@
 
 #define BORDER_DELIMS "{}[]:,"
 
+static int jl_eos(struct sjp_lexer *l)
+{
+  return l->data == NULL;
+}
+
 static int jl_getc(struct sjp_lexer *l)
 {
   int ch;
 
-  if (l->off >= l->sz) {
+  if (l->data == NULL || l->off >= l->sz) {
     return EOF;
   }
 
@@ -303,8 +308,13 @@ fast_path:
     }
   }
 
-  // if the fast-path loop terminates without a '"', return
-  // a partial result
+  // if the fast-path loop terminates without a '"':
+  //   1) if EOS, then we have unfinished input
+  //   2) otherwise return a partial result
+  if (jl_eos(l)) {
+    return SJP_UNFINISHED_INPUT;
+  }
+
   tok->value = &l->data[off0];
   tok->n = l->off - off0;
   return SJP_MORE;
@@ -569,6 +579,13 @@ encode_utf8:
   }
 
 partial:
+  // if the slow-path loop terminates without a '"':
+  //   1) if EOS, then we have unfinished input
+  //   2) otherwise return a partial result
+  if (jl_eos(l)) {
+    return SJP_UNFINISHED_INPUT;
+  }
+
   tok->value = &l->data[off0];
   tok->n = outInd - off0;
   return SJP_MORE;
@@ -631,6 +648,9 @@ st_dig:
   for(;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
+      if (jl_eos(l)) {
+        goto finish;
+      }
       goto more;
     }
 
@@ -652,6 +672,9 @@ st_dig0:
   l->state = SJP_LST_NUM_DIG0;
   ch = jl_getc(l);
   if (ch == EOF) {
+    if (jl_eos(l)) {
+      goto finish;
+    }
     goto more;
   }
 
@@ -676,6 +699,9 @@ st_dot:
   l->state = SJP_LST_NUM_DOT;
   ch = jl_getc(l);
   if (ch == EOF) {
+    if (jl_eos(l)) {
+      goto invalid;
+    }
     goto more;
   }
 
@@ -689,6 +715,9 @@ st_digf:
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
+      if (jl_eos(l)) {
+        goto finish;
+      }
       goto more;
     }
 
@@ -713,6 +742,9 @@ st_exp:
 
 st_esign:
   if (ch == EOF) {
+    if (jl_eos(l)) {
+      goto invalid;
+    }
     goto more;
   }
 
@@ -725,6 +757,9 @@ st_edig:
   for (;;) {
     ch = jl_getc(l);
     if (ch == EOF) {
+      if (jl_eos(l)) {
+        goto finish;
+      }
       goto more;
     }
 
@@ -757,25 +792,22 @@ static int parse_value(struct sjp_lexer *l, struct sjp_token *tok)
   tok->type = SJP_TOK_NONE;
   tok->value = NULL;
 
+  while (ch = jl_getc(l), ch != EOF) {
   // Skip whitespace
   // XXX - is this the right definition of whitespace in json?
-  while (l->off < l->sz) {
-    ch = l->data[l->off];
     if (!isspace(ch)) {
+      jl_ungetc(l,ch);
       break;
-    }
-
-    l->off++;
-
-    if (ch == '\n') {
-      l->line++;
-      l->prev_lbeg = l->lbeg;
-      l->lbeg = l->off;
     }
   }
 
-  if (l->off >= l->sz) {
-    return SJP_MORE;
+  if (ch == EOF) {
+    if (!jl_eos(l)) {
+      return SJP_MORE;
+    }
+    tok->type = SJP_TOK_EOS;
+    tok->value = NULL;
+    return SJP_OK;
   }
 
   ch = l->data[l->off];

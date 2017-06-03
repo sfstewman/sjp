@@ -29,11 +29,14 @@ const char *evt2name(enum SJP_EVENT evt);
 
 // special marker to cause the test function to close the stream
 extern const char testing_close_marker[];
+extern const char testing_end_of_stream[];
 
 struct lexer_output {
   enum SJP_RESULT ret;
   enum SJP_TOKEN type;
   const char *value;
+  int checknum;
+  double num;
 };
 
 static inline int lex_is_sentinel(struct lexer_output *out)

@@ -4,6 +4,7 @@
 #include <string.h>
 
 const char testing_close_marker[] = { 0, 'c', 'l', 'm', 'k', 0 };
+const char testing_end_of_stream[] = { 0, 'e', 'o', 's', 0 };
 
 int ntest = 0;
 int nfail = 0;
@@ -78,6 +79,7 @@ const char *tok2name(enum SJP_TOKEN type)
     case SJP_TOK_CBRACKET: return "]"; 
     case SJP_TOK_COMMA:    return ",";
     case SJP_TOK_COLON:    return ":";
+    case SJP_TOK_EOS:      return "EOS";
     default:            return "UNKNOWN";
   }
 }
