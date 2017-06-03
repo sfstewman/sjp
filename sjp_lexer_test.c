@@ -639,6 +639,60 @@ void test_invalid_keywords(void)
     "fals",
     testing_close_marker,
 
+
+    // test for partial keywords, truncated by the end of the stream
+    "t",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "tr",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "tru",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "true",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "f",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "fa",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "fal",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "fals",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "false",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "n",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "nu",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "nul",
+    testing_end_of_stream,
+    testing_close_marker,
+
+    "null",
+    testing_end_of_stream,
+    testing_close_marker,
+
     NULL
   };
 
@@ -651,6 +705,63 @@ void test_invalid_keywords(void)
 
     { SJP_MORE, SJP_TOK_NONE, "fals" },
     { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" },
+
+
+    // test for partial keywords, truncated by the end of the stream
+    { SJP_MORE, SJP_TOK_NONE, "t" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_TRUE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "tr" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_TRUE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "tru" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_TRUE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_OK, SJP_TOK_TRUE, "true" },
+    { SJP_OK, SJP_TOK_EOS, "" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+
+    { SJP_MORE, SJP_TOK_NONE, "f" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_FALSE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "fa" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_FALSE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "fal" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_FALSE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "fals" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_FALSE, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_OK, SJP_TOK_FALSE, "false" },
+    { SJP_OK, SJP_TOK_EOS, "" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
+
+    { SJP_MORE, SJP_TOK_NONE, "n" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NULL, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "nu" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NULL, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_MORE, SJP_TOK_NONE, "nul" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NULL, "" },
+    { SJP_UNFINISHED_INPUT, SJP_TOK_NONE, "" }, // for close call
+
+    { SJP_OK, SJP_TOK_NULL, "null" },
+    { SJP_OK, SJP_TOK_EOS, "" },
+    { SJP_OK, SJP_TOK_NONE, "" },
+
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };

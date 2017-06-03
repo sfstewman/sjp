@@ -81,13 +81,8 @@ static int parse_kw(struct sjp_lexer *l, struct sjp_token *tok)
   const char *kw = NULL;
   char *b = NULL;
 
-  if (l->off >= l->sz) {
-    return SJP_INTERNAL_ERROR;
-  }
-
   off0 = l->off;
 
-  // TODO: restart state
   ch = (l->state == SJP_LST_KEYWORD) ? l->buf[0] : jl_getc(l);
   switch (ch) {
     case 't':
@@ -163,6 +158,12 @@ static int parse_kw(struct sjp_lexer *l, struct sjp_token *tok)
   return SJP_OK;
 
 partial:
+  if (jl_eos(l)) {
+    tok->value = NULL;
+    tok->n = 0;
+    return SJP_UNFINISHED_INPUT;
+  }
+
   *b = 0;
   l->state = SJP_LST_KEYWORD;
   tok->type = SJP_TOK_NONE;
