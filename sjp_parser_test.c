@@ -18,12 +18,13 @@ static int parser_is_sentinel(struct parser_output *out)
 
 static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct parser_output *outputs)
 {
-  int i, j, more, close;
+  int i, j, more, close, eos;
   char inbuf[2048];
 
   i=0;
   j=0;
   more=1;
+  eos=0;
   close=0;
 
   while(1) {
@@ -67,13 +68,19 @@ static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct
         close=0;
       }
 
-      if (inputs[i] != testing_close_marker) {
+      eos=0;
+
+      if (inputs[i] == testing_close_marker) {
+        close=1;
+        LOG("[CLOSE] %s\n", "");
+      } else if (inputs[i] == testing_end_of_stream) {
+        eos=1;
+        LOG("[EOS] %s\n", inbuf);
+        sjp_parser_eos(p);
+      } else {
         snprintf(inbuf, sizeof inbuf, "%s", inputs[i]);
         LOG("[MORE] %s\n", inbuf);
         sjp_parser_more(p, inbuf, strlen(inbuf));
-      } else {
-        close=1;
-        LOG("[CLOSE] %s\n", "");
       }
       i++;
     }
@@ -110,13 +117,18 @@ static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct
 
     outlen = (outputs[j].text != NULL) ? strlen(outputs[j].text) : 0;
 
-    if (evt.n != outlen) {
+    if ((evt.n != outlen) || (outlen > 0 && evt.n > 0 && memcmp(evt.text,outputs[j].text,outlen) != 0)) {
       printf("i=%d, j=%d, expected text '%s' but found '%s'\n",
           i,j, outputs[j].text ? outputs[j].text : "<NULL>", buf);
       return -1;
     }
 
-    more = (ret == SJP_MORE) || close;
+    if (outputs[j].checknum && evt.d != outputs[j].num) {
+      printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, evt.d);
+      return -1;
+    }
+
+    more = (ret == SJP_MORE) || close || eos;
     j++;
   }
 
@@ -177,12 +189,15 @@ void test_values(void)
     testing_close_marker,
 
     "1",
+    testing_end_of_stream,
     testing_close_marker,
 
     "1.1",
+    testing_end_of_stream,
     testing_close_marker,
 
     "1.35e-2",
+    testing_end_of_stream,
     testing_close_marker,
 
     "true",
@@ -203,12 +218,15 @@ void test_values(void)
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1" },
+    { SJP_OK, SJP_NUMBER, "", 1, 1 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1.1" },
+    { SJP_OK, SJP_NUMBER, "", 1, 1.1 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1.35e-2" },
+    { SJP_OK, SJP_NUMBER, "", 1, 1.35e-2 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_OK, SJP_TRUE, "true" },
@@ -288,7 +306,7 @@ void test_simple_arrays(void)
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_STRING, "foo" },
     { SJP_OK, SJP_STRING, "bar" },
-    { SJP_OK, SJP_NUMBER, "2378" },
+    { SJP_OK, SJP_NUMBER, "2378", 1, 2378 },
     { SJP_OK, SJP_ARRAY_END, "]" },
 
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
@@ -561,7 +579,7 @@ void test_detect_unclosed_things(void)
     // test nested things
     { SJP_OK, SJP_OBJECT_BEG, "{" },
     { SJP_OK, SJP_STRING, "foo" },
-    { SJP_OK, SJP_ARRAY_BEG, "{" },
+    { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_NUMBER, "123" },
     { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
@@ -578,7 +596,7 @@ void test_detect_unclosed_things(void)
     { SJP_OK, SJP_STRING, "foo" },
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_NUMBER, "123" },
-    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_STRING, "bar" },
     { SJP_MORE, SJP_NONE, "" },
     { SJP_UNCLOSED_ARRAY, SJP_NONE, NULL },
 

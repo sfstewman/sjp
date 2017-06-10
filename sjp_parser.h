@@ -43,6 +43,7 @@ struct sjp_event {
 
   const char *text;
   size_t n;
+  double d;
 };
 
 enum {
@@ -86,6 +87,12 @@ void sjp_parser_reset(struct sjp_parser *p);
 
 // Feeds more data to the parser.
 void sjp_parser_more(struct sjp_parser *p, char *data, size_t n);
+
+// Tells the parser that we've reached the end of the stream.
+static inline void sjp_parser_eos(struct sjp_parser *p)
+{
+  sjp_parser_more(p, NULL, 0);
+}
 
 // Fetches the next json event.
 //

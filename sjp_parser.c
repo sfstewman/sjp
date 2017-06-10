@@ -101,7 +101,10 @@ static int parse_value(struct sjp_parser *p, struct sjp_event *evt, int ret, str
     case SJP_TOK_TRUE:   evt->type = SJP_TRUE;   break;
     case SJP_TOK_FALSE:  evt->type = SJP_FALSE;  break;
     case SJP_TOK_STRING: evt->type = SJP_STRING; break;
-    case SJP_TOK_NUMBER: evt->type = SJP_NUMBER; break;
+    case SJP_TOK_NUMBER:
+      evt->type = SJP_NUMBER;
+      evt->d = tok->dbl;
+      break;
 
     case '{':
       evt->type = SJP_OBJECT_BEG;
@@ -276,7 +279,8 @@ enum SJP_RESULT sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt)
 
 restart:
   evt->text = NULL;
-  evt->n =0;
+  evt->n = 0;
+  evt->d = 0;
 
   // XXX - stream of values?
   if (p->top == 0) {
@@ -298,6 +302,9 @@ restart:
 
   evt->text = tok.value;
   evt->n = tok.n;
+  if (evt->type == SJP_TOK_NUMBER) {
+    evt->d = tok.dbl;
+  }
 
   switch (st) {
     case SJP_PARSER_VALUE:
@@ -327,6 +334,7 @@ restart:
 
         case SJP_TOK_NUMBER:
           evt->type = SJP_NUMBER;
+          evt->d = tok.dbl;
           break;
 
         default:

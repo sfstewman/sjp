@@ -50,6 +50,8 @@ struct parser_output {
   enum SJP_RESULT ret;
   enum SJP_EVENT type;
   const char *text;
+  int checknum;
+  double num;
 };
 
 #undef MODULE_NAME
