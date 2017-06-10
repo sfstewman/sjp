@@ -559,7 +559,8 @@ encode_utf8:
           // utf8 encodes in 1-4 bytes, and \uXYZW is six bytes, so this
           // only matters on a restart.  Because it's a restart, there's
           // no existing string, so emit the buffer
-          if (nb > l->off - outInd) {
+          assert(l->off >= outInd);
+          if ((int64_t)nb > (int64_t)(l->off - outInd)) {
             assert(outInd == off0);
             tok->value = &l->buf[0];
             tok->n = nb;
@@ -773,7 +774,7 @@ st_edig:
 
 more:
   {
-    int n;
+    size_t n;
 
     tok->n = l->off - off0;
     n = sizeof l->buf - l->buf[0];
@@ -791,7 +792,7 @@ more:
 
 finish:
   {
-    int n;
+    size_t n;
 
     l->state = SJP_LST_VALUE;
     tok->n = l->off - off0;
@@ -806,7 +807,7 @@ finish:
       l->buf[0] = off + n;
     }
 
-    if (l->buf[0] < sizeof l->buf) {
+    if ((unsigned char)l->buf[0] < sizeof l->buf) {
       char *ep= NULL;
       int ind = l->buf[0];
 
