@@ -440,6 +440,11 @@ void sjp_parser_more(struct sjp_parser *p, char *data, size_t n)
   sjp_lexer_more(&p->lex, data, n);
 }
 
+int sjp_parser_state(struct sjp_parser *p)
+{
+    return jp_getstate(p);
+}
+
 enum SJP_RESULT sjp_parser_close(struct sjp_parser *p)
 {
   int ret;

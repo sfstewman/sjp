@@ -132,6 +132,9 @@ enum SJP_RESULT sjp_parser_next(struct sjp_parser *p, struct sjp_event *evt);
 // The caller is responsible for free'ing any allocated buffers.
 enum SJP_RESULT sjp_parser_close(struct sjp_parser *p);
 
+// Returns the current state of the parser.  Undefined if the parser
+// is uninitialized or closed.
+int sjp_parser_state(struct sjp_parser *p);
 
 #undef MODULE_NAME
 
