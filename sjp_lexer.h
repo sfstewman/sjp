@@ -132,10 +132,45 @@ static inline void sjp_lexer_eos(struct sjp_lexer *l)
   sjp_lexer_more(l, NULL, 0);
 }
 
-// Returns the next token or partial token
+// Returns the next complete token or partial token.  Both the l and the
+// tok parameter must be non-NULL.
 //
-// If the return is a partial token, the buffer is exhausted.  If the
-// token type is not SJP_NONE, the lexer expects a partial token
+// If the return value is SJP_OK:
+//   On return, if tok->type is SJP_TOK_NONE, this indicates an
+//   end-of-stream (sjp_lexer_eos has previously been called).
+//
+//   Otherwise, the lexer returns a complete token.
+//
+// If the return value is SJP_MORE:
+//   The lexer input buffer is exhausted, and the lexer cannot advance
+//   further until more input is provided via sjp_lexer_more().
+//
+//   On return, if tok->type is SJP_TOK_NONE, this does *not* indicate
+//   an end-of-stream, only that the lexer cannot return a partial
+//   token.  Otherwise, a partial token is returned.
+//
+// If the return value is SJP_PARTIAL:
+//   Only a partial token is available, but the lexer input buffer is
+//   not exhausted and sjp_lexer_more() should not be called.
+//
+//   On return, tok->type should never be SJP_TOK_NONE.
+//
+// If the return value is negative, the lexer encountered an error.
+//
+// After an end-of-stream or an error, the lexer should be reset
+// via sjp_lexer_init() before additional calls are made.
+//
+// Tokens:
+//   On return, the tok->type field will have the type of token
+//   returned, if any.
+//
+//   For return values of SJP_MORE, the only values of tok->type should
+//   be SJP_TOK_NONE, SJP_TOK_STRING, or SJP_TOK_NUMBER.
+//
+//   Currently SJP_PARTIAL will only be returned in certain cases of
+//   parsing \u escapes on strings.  However, this may change in
+//   subsequent versions.
+//
 enum SJP_RESULT sjp_lexer_token(struct sjp_lexer *l, struct sjp_token *tok);
 
 // Closes the lexer state.  If the lexer is not at a position where it
