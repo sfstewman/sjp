@@ -20,6 +20,8 @@ enum SJP_EVENT {
   SJP_ARRAY_END,
 };
 
+#define SJP_EVENT_MAX 10
+
 enum SJP_PARSER_STATE {
   SJP_PARSER_VALUE = 0,
 
