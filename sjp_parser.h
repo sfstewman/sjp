@@ -41,11 +41,19 @@ enum SJP_PARSER_STATE {
 };
 
 struct sjp_event {
-  enum SJP_EVENT type;
+  enum SJP_EVENT type;  // type of json event
 
-  const char *text;
-  size_t n;
-  double d;
+  const char *text;     // raw text of token
+  size_t n;             // number of bytes of raw text
+
+  /* Holds type-dependent extra information:
+   *   ncp - number of codepoints in string
+   *   d   - double-precision value of number
+   */
+  union {
+    size_t ncp;
+    double d;
+  } extra;
 };
 
 enum {

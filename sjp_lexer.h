@@ -113,7 +113,12 @@ enum SJP_TOKEN {
 struct sjp_token {
   size_t n;
   const char *value;
-  double dbl;
+
+  /* extra (type-dependent) information about the token */
+  union {
+    size_t ncp; // SJP_TOK_STRING: number of codepoints fully parsed in string
+    double dbl; // SJP_TOK_NUMBER: double precision value of number
+  } extra;
   enum SJP_TOKEN type;
 };
 

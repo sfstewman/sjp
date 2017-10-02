@@ -31,12 +31,18 @@ const char *evt2name(enum SJP_EVENT evt);
 extern const char testing_close_marker[];
 extern const char testing_end_of_stream[];
 
+enum SJP_TEST_FLAGS {
+  SJP_TEST_NUM_CODEPOINTS = 1 << 0,
+  SJP_TEST_NUMBER         = 1 << 1,
+};
+
 struct lexer_output {
   enum SJP_RESULT ret;
   enum SJP_TOKEN type;
   const char *value;
-  int checknum;
+  enum SJP_TEST_FLAGS flags;
   double num;
+  size_t ncp;
 };
 
 static inline int lex_is_sentinel(struct lexer_output *out)
@@ -50,8 +56,9 @@ struct parser_output {
   enum SJP_RESULT ret;
   enum SJP_EVENT type;
   const char *text;
-  int checknum;
+  enum SJP_TEST_FLAGS flags;
   double num;
+  size_t ncp;
 };
 
 #undef MODULE_NAME

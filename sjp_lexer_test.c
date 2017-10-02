@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <assert.h>
+
 int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_output *outputs)
 {
   int i, j, more, close, eos;
@@ -113,9 +115,18 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
       }
     }
 
-    if (outputs[j].checknum) {
-      if (tok.dbl != outputs[j].num) {
-        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, tok.dbl);
+    if (outputs[j].flags & SJP_TEST_NUMBER) {
+      assert(outputs[j].type == SJP_TOK_NUMBER);
+      if (tok.extra.dbl != outputs[j].num) {
+        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, tok.extra.dbl);
+        return -1;
+      }
+    }
+
+    if (outputs[j].flags & SJP_TEST_NUM_CODEPOINTS) {
+      assert(outputs[j].type == SJP_TOK_STRING);
+      if (tok.extra.ncp != outputs[j].ncp) {
+        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, tok.extra.dbl);
         return -1;
       }
     }
@@ -200,7 +211,7 @@ void test_simple_object(void)
     { SJP_OK, '{'        , "{"     },
     { SJP_OK, SJP_TOK_STRING, "hello"   },
     { SJP_OK, ':'        , ":"     },
-    { SJP_OK, SJP_TOK_NUMBER, "0", 1, 0  },
+    { SJP_OK, SJP_TOK_NUMBER, "0", SJP_TEST_NUMBER, 0  },
     { SJP_OK, '}'        , "}"     },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
@@ -525,36 +536,36 @@ void test_numbers(void)
   };
 
   struct lexer_output outputs[] = {
-    { SJP_OK, SJP_TOK_NUMBER  , "3",       1, 3 },
-    { SJP_OK, SJP_TOK_NUMBER  , "57",      1, 57 },
-    { SJP_OK, SJP_TOK_NUMBER  , "0",       1, 0 },
-    { SJP_OK, SJP_TOK_NUMBER  , "0.451",   1, 0.451 },
-    { SJP_OK, SJP_TOK_NUMBER  , "10.2343", 1, 10.2343 },
-    { SJP_OK, SJP_TOK_NUMBER  , "-3.4",    1, -3.4 },
-    { SJP_OK, SJP_TOK_NUMBER  , "-0.3",    1, -0.3 },
+    { SJP_OK, SJP_TOK_NUMBER  , "3",       SJP_TEST_NUMBER, 3 },
+    { SJP_OK, SJP_TOK_NUMBER  , "57",      SJP_TEST_NUMBER, 57 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0",       SJP_TEST_NUMBER, 0 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.451",   SJP_TEST_NUMBER, 0.451 },
+    { SJP_OK, SJP_TOK_NUMBER  , "10.2343", SJP_TEST_NUMBER, 10.2343 },
+    { SJP_OK, SJP_TOK_NUMBER  , "-3.4",    SJP_TEST_NUMBER, -3.4 },
+    { SJP_OK, SJP_TOK_NUMBER  , "-0.3",    SJP_TEST_NUMBER, -0.3 },
 
-    { SJP_OK, SJP_TOK_NUMBER  , "5.4e-23", 1, 5.4e-23 },
-    { SJP_OK, SJP_TOK_NUMBER  , "0.93e+7", 1, 0.93e7 },
-    { SJP_OK, SJP_TOK_NUMBER  , "7e2",     1, 7e2 },
+    { SJP_OK, SJP_TOK_NUMBER  , "5.4e-23", SJP_TEST_NUMBER, 5.4e-23 },
+    { SJP_OK, SJP_TOK_NUMBER  , "0.93e+7", SJP_TEST_NUMBER, 0.93e7 },
+    { SJP_OK, SJP_TOK_NUMBER  , "7e2",     SJP_TEST_NUMBER, 7e2 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
     { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_NUMBER  , "3" },
     // { SJP_MORE, SJP_TOK_NUMBER, "" },
-    { SJP_OK, SJP_TOK_NUMBER, "", 1, 3 },
+    { SJP_OK, SJP_TOK_NUMBER, "", SJP_TEST_NUMBER, 3 },
     { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_NUMBER  , "3.5" },
-    { SJP_OK, SJP_TOK_NUMBER, "", 1, 3.5 },
+    { SJP_OK, SJP_TOK_NUMBER, "", SJP_TEST_NUMBER, 3.5 },
     { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_NUMBER  , "-3.5" },
-    { SJP_OK, SJP_TOK_NUMBER, NULL, 1, -3.5 },
+    { SJP_OK, SJP_TOK_NUMBER, NULL, SJP_TEST_NUMBER, -3.5 },
     { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_NUMBER  , "3.592e+3" },
-    { SJP_OK, SJP_TOK_NUMBER, NULL, 1, 3.592e3 },
+    { SJP_OK, SJP_TOK_NUMBER, NULL, SJP_TEST_NUMBER, 3.592e3 },
     { SJP_OK, SJP_TOK_NONE, "" },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
@@ -621,25 +632,25 @@ void test_number_restarts(void)
 
   struct lexer_output outputs[] = {
     { SJP_MORE, SJP_TOK_NUMBER, "3" },
-    { SJP_OK, SJP_TOK_NUMBER  , "456", 1, 3456 },
+    { SJP_OK, SJP_TOK_NUMBER  , "456", SJP_TEST_NUMBER, 3456 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "5" },
-    { SJP_OK, SJP_TOK_NUMBER  , ".37", 1, 5.37 },
+    { SJP_OK, SJP_TOK_NUMBER  , ".37", SJP_TEST_NUMBER, 5.37 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "+5", 1, 54.19e5 },
+    { SJP_OK, SJP_TOK_NUMBER  , "+5", SJP_TEST_NUMBER, 54.19e5 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19" },
-    { SJP_OK, SJP_TOK_NUMBER  , "e-16", 1, 54.19e-16 },
+    { SJP_OK, SJP_TOK_NUMBER  , "e-16", SJP_TEST_NUMBER, 54.19e-16 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.1" },
-    { SJP_OK, SJP_TOK_NUMBER  , "9E07", 1, 54.19e7 },
+    { SJP_OK, SJP_TOK_NUMBER  , "9E07", SJP_TEST_NUMBER, 54.19e7 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "+3", 1, 54.19e3 },
+    { SJP_OK, SJP_TOK_NUMBER  , "+3", SJP_TEST_NUMBER, 54.19e3 },
 
     { SJP_MORE, SJP_TOK_NUMBER, "54.19e" },
-    { SJP_OK, SJP_TOK_NUMBER  , "17", 1, 54.19e17 },
+    { SJP_OK, SJP_TOK_NUMBER  , "17", SJP_TEST_NUMBER, 54.19e17 },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
   };
@@ -1103,9 +1114,9 @@ void test_nested_arrays_and_objects(void)
                 { SJP_OK, SJP_TOK_STRING, "baz"},
                 { SJP_OK, ':', ":" },
                 { SJP_OK, '[', "[" },
-                        { SJP_OK, SJP_TOK_NUMBER, "123", 1, 123},
+                        { SJP_OK, SJP_TOK_NUMBER, "123", SJP_TEST_NUMBER, 123},
                         { SJP_OK, ',', "," },
-                        { SJP_OK, SJP_TOK_NUMBER, "456", 1, 456}, 
+                        { SJP_OK, SJP_TOK_NUMBER, "456", SJP_TEST_NUMBER, 456}, 
                 { SJP_OK, ']', "]" },
         { SJP_OK, '}', "}" },
     { SJP_OK, ']', "]" },
@@ -1118,7 +1129,7 @@ void test_nested_arrays_and_objects(void)
                 { SJP_OK, SJP_TOK_STRING, "bar" },
                 { SJP_OK, ':', ":" },
                 { SJP_OK, '[', "[" },
-                        { SJP_OK, SJP_TOK_NUMBER, "123", 1, 123},
+                        { SJP_OK, SJP_TOK_NUMBER, "123", SJP_TEST_NUMBER, 123},
                         { SJP_OK, ',', "," },
                         { SJP_OK, '{', "{" },
                                 { SJP_OK, SJP_TOK_STRING, "baz"},
@@ -1129,7 +1140,7 @@ void test_nested_arrays_and_objects(void)
         { SJP_OK, ',', "," },
                 { SJP_OK, SJP_TOK_STRING, "quux" },
                 { SJP_OK, ':', ":" },
-                { SJP_OK, SJP_TOK_NUMBER, "-23.56e+5", 1, -23.56e5 },
+                { SJP_OK, SJP_TOK_NUMBER, "-23.56e+5", SJP_TEST_NUMBER, -23.56e5 },
         { SJP_OK, '}', "}" },
     { SJP_OK, '}', "}" },
     { SJP_MORE, SJP_TOK_NONE, "" },

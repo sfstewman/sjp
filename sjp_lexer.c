@@ -812,7 +812,7 @@ finish:
       int ind = l->buf[0];
 
       l->buf[ind] = '\0';
-      tok->dbl = strtod(&l->buf[1], &ep);
+      tok->extra.dbl = strtod(&l->buf[1], &ep);
       // XXX - handle overflow, underflow cases?
       assert(ep && *ep == '\0');
     }
