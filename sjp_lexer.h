@@ -86,6 +86,7 @@ struct sjp_lexer {
   char *data;
   uint32_t u8st;
   uint32_t u8cp;
+  size_t ncp;
 
   // buffer to allow restart during keyword/string/number states
   char buf[SJP_LEX_RESTART_SIZE];

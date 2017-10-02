@@ -126,7 +126,7 @@ int lexer_test_inputs(struct sjp_lexer *lex, const char *inputs[], struct lexer_
     if (outputs[j].flags & SJP_TEST_NUM_CODEPOINTS) {
       assert(outputs[j].type == SJP_TOK_STRING);
       if (tok.extra.ncp != outputs[j].ncp) {
-        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, tok.extra.dbl);
+        printf("i=%d, j=%d, expected number %zu but found %zu\n", i,j, outputs[j].ncp, tok.extra.ncp);
         return -1;
       }
     }
@@ -244,19 +244,59 @@ void test_string_with_escapes(void)
   };
 
   struct lexer_output outputs[] = {
-    { SJP_OK, SJP_TOK_STRING, "this string \"has\" double quote escapes" },
+    { SJP_OK, SJP_TOK_STRING, "this string \"has\" double quote escapes",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 38 },
     { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { SJP_OK, SJP_TOK_STRING, "this string has \\ some escape c\bsequences / combinations" },
+    { SJP_OK, SJP_TOK_STRING, "this string has \\ some escape c\bsequences / combinations",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 56},
     { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { SJP_OK, SJP_TOK_STRING, "this string tests form-feed\fand carriage-return \r\nand newline" },
+    { SJP_OK, SJP_TOK_STRING, "this string tests form-feed\fand carriage-return \r\nand newline",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 61},
     { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { SJP_OK, SJP_TOK_STRING, "this string tests \ttab" },
+    { SJP_OK, SJP_TOK_STRING, "this string tests \ttab",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 22},
     { SJP_MORE, SJP_TOK_NONE, "" },
 
-    { SJP_OK, SJP_TOK_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E" },
+    { SJP_OK, SJP_TOK_STRING, "this string has unicode escapes: G\u00fcnter \u2318 \u65E5 \u672C \u8A9E",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 47},
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
+  };
+
+  ntest++;
+
+  int ret;
+  struct sjp_lexer lex = { 0 };
+
+  if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
+    nfail++;
+    printf("FAILED: %s\n", __func__);
+  }
+}
+
+void test_string_num_codepoints(void)
+{
+  const char *inputs[] = {
+    "\"simple string\"",
+    "\"string with utf8: \xc3\xbe\xc2\xa2\xe0\xbc\xb2\"", // three codepoints in utf8
+    "\"shrug: \xc2\xaf\\\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf\"", // emoji shrug is nine codepoints
+    NULL
+  };
+
+  struct lexer_output outputs[] = {
+    { SJP_OK, SJP_TOK_STRING, "simple string", SJP_TEST_NUM_CODEPOINTS, 0.0, 13 },
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, SJP_TOK_STRING, "string with utf8: \xc3\xbe\xc2\xa2\xe0\xbc\xb2",
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 21 },
+    { SJP_MORE, SJP_TOK_NONE, "" },
+
+    { SJP_OK, SJP_TOK_STRING, "shrug: \xc2\xaf\x5c\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf",
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 16 },
     { SJP_MORE, SJP_TOK_NONE, "" },
 
     { SJP_OK, SJP_TOK_NONE, NULL }, // end sentinel
@@ -396,13 +436,13 @@ void test_string_with_restarts_and_escapes(void)
 
   struct lexer_output outputs[] = {
     { SJP_MORE, SJP_TOK_STRING, "this set of strings " },
-    { SJP_OK, SJP_TOK_STRING, "\"break\" the escapes" },
+    { SJP_OK, SJP_TOK_STRING, "\"break\" the escapes", SJP_TEST_NUM_CODEPOINTS, 0.0, 39 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_STRING, "the breaks " },
     { SJP_MORE, SJP_TOK_STRING, "\nare sometimes for longer " },
-    { SJP_OK, SJP_TOK_STRING, "\\u sequences: " },
+    { SJP_OK, SJP_TOK_STRING, "\\u sequences: ", SJP_TEST_NUM_CODEPOINTS, 0.0, 51 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
@@ -412,7 +452,7 @@ void test_string_with_restarts_and_escapes(void)
     { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
     { SJP_MORE, SJP_TOK_STRING, "\u00fc and " },
     { SJP_PARTIAL, SJP_TOK_STRING, "\u00fc" },
-    { SJP_OK, SJP_TOK_STRING, "" },
+    { SJP_OK, SJP_TOK_STRING, "", SJP_TEST_NUM_CODEPOINTS, 0.0, 30 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
@@ -423,7 +463,7 @@ void test_string_with_restarts_and_escapes(void)
     { SJP_PARTIAL, SJP_TOK_STRING, "\u2318" },
     { SJP_MORE, SJP_TOK_STRING, " and " },
     { SJP_PARTIAL, SJP_TOK_STRING, "\u2318" },
-    { SJP_OK, SJP_TOK_STRING, "" },
+    { SJP_OK, SJP_TOK_STRING, "", SJP_TEST_NUM_CODEPOINTS, 0.0, 29 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
@@ -434,7 +474,7 @@ void test_string_with_restarts_and_escapes(void)
     { SJP_PARTIAL, SJP_TOK_STRING, "\u65E5" },
     { SJP_MORE, SJP_TOK_STRING, " and " },
     { SJP_PARTIAL, SJP_TOK_STRING, "\u65E5" },
-    { SJP_OK, SJP_TOK_STRING, "" },
+    { SJP_OK, SJP_TOK_STRING, "", SJP_TEST_NUM_CODEPOINTS, 0.0, 29 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
@@ -445,7 +485,7 @@ void test_string_with_restarts_and_escapes(void)
     { SJP_PARTIAL, SJP_TOK_STRING, "\u8A9E" },
     { SJP_MORE, SJP_TOK_STRING, " and " },
     { SJP_PARTIAL, SJP_TOK_STRING, "\u8A9E" },
-    { SJP_OK, SJP_TOK_STRING, "" },
+    { SJP_OK, SJP_TOK_STRING, "", SJP_TEST_NUM_CODEPOINTS, 0.0, 29 },
 
     { SJP_MORE, SJP_TOK_NONE, "" },
 
@@ -459,7 +499,7 @@ void test_string_with_restarts_and_escapes(void)
 
   if (ret = lexer_test_inputs(&lex, inputs, outputs), ret != 0) {
     nfail++;
-    printf("FAILED: test_simple\n");
+    printf("FAILED: %s\n", __func__);
   }
 }
 
@@ -479,16 +519,17 @@ void test_string_with_surrogate_pairs(void)
   };
 
   struct lexer_output outputs[] = {
-    { SJP_OK, SJP_TOK_STRING, "this string has a surrogate pair: \xf0\xa0\x88\x93" },
+    { SJP_OK, SJP_TOK_STRING, "this string has a surrogate pair: \xf0\xa0\x88\x93",
+        SJP_TEST_NUM_CODEPOINTS, 0.0, 35 },
     { SJP_MORE, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_STRING, "this string splits the surrogate pair: " },
-    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93", SJP_TEST_NUM_CODEPOINTS, 0.0, 40 },
     { SJP_MORE, SJP_TOK_NONE, "" },
 
     { SJP_MORE, SJP_TOK_STRING, "another split " },
     { SJP_MORE, SJP_TOK_STRING, "" },
-    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93" },
+    { SJP_OK, SJP_TOK_STRING, "\xf0\xa0\x88\x93", SJP_TEST_NUM_CODEPOINTS, 0.0, 15 },
     { SJP_MORE, SJP_TOK_NONE, "" },
 
     /*
@@ -1164,6 +1205,7 @@ int main(void)
   test_simple_array();
   test_simple_object();
 
+  test_string_num_codepoints();
   test_string_with_escapes();
   test_simple_restarts();
   test_string_with_restarts_and_escapes();

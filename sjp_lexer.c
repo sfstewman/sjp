@@ -266,6 +266,7 @@ static int parse_str(struct sjp_lexer *l, struct sjp_token *tok)
       l->state = SJP_LST_STR;
       l->u8st  = 0;
       l->u8cp  = 0;
+      l->ncp = 0;
       /* fallthrough */
 
     case SJP_LST_STR:
@@ -279,7 +280,12 @@ static int parse_str(struct sjp_lexer *l, struct sjp_token *tok)
   // fast path: no escapes, scan for next '"'
 fast_path:
   while (ch = jl_getc(l), ch != EOF) {
-    if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
+    uint32_t dec;
+    
+    dec = u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch);
+    if (dec == UTF8_ACCEPT) {
+      l->ncp++;
+    } else if (dec == UTF8_REJECT) {
       l->state = SJP_LST_VALUE;
       return SJP_INVALID_CHAR;
     }
@@ -288,6 +294,7 @@ fast_path:
         l->state = SJP_LST_VALUE;
         tok->value = &l->data[off0];
         tok->n = l->off - off0 - 1; // last -1 is to omit the trailing "
+        tok->extra.ncp = l->ncp - 1;
         return SJP_OK;
     }
 
@@ -326,10 +333,14 @@ fast_path:
   // outInd MUST be set correctly at this point
 
   while (ch = jl_getc(l), ch != EOF) {
+    uint32_t dec;
     long cp;
     int hexdig;
 
-    if (u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch) == UTF8_REJECT) {
+    dec = u8_decode(&l->u8st, &l->u8cp, (uint32_t)ch);
+    if (dec == UTF8_ACCEPT) {
+      l->ncp++;
+    } else if (dec == UTF8_REJECT) {
       l->state = SJP_LST_VALUE;
       return SJP_INVALID_CHAR;
     }
@@ -338,6 +349,7 @@ fast_path:
       l->state = SJP_LST_VALUE;
       tok->value = &l->data[off0];
       tok->n = outInd - off0;
+      tok->extra.ncp = l->ncp - 1;
       return SJP_OK;
     }
 
