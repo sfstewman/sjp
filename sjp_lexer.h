@@ -86,6 +86,7 @@ struct sjp_lexer {
   char *data;
   uint32_t u8st;
   uint32_t u8cp;
+  size_t ncp;
 
   // buffer to allow restart during keyword/string/number states
   char buf[SJP_LEX_RESTART_SIZE];
@@ -113,7 +114,12 @@ enum SJP_TOKEN {
 struct sjp_token {
   size_t n;
   const char *value;
-  double dbl;
+
+  /* extra (type-dependent) information about the token */
+  union {
+    size_t ncp; // SJP_TOK_STRING: number of codepoints fully parsed in string
+    double dbl; // SJP_TOK_NUMBER: double precision value of number
+  } extra;
   enum SJP_TOKEN type;
 };
 

@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <assert.h>
+
 #define DEFAULT_STACK 16
 #define NO_BUF         0
 #define SMALL_BUF    128
@@ -123,9 +125,12 @@ static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct
       return -1;
     }
 
-    if (outputs[j].checknum && evt.d != outputs[j].num) {
-      printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, evt.d);
-      return -1;
+    if (outputs[j].flags & SJP_TEST_NUMBER) {
+      assert(evt.type == SJP_NUMBER);
+      if (evt.extra.d != outputs[j].num) {
+        printf("i=%d, j=%d, expected number %f but found %f\n", i,j, outputs[j].num, evt.extra.d);
+        return -1;
+      }
     }
 
     more = (ret == SJP_MORE) || close || eos;
@@ -218,15 +223,15 @@ void test_values(void)
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1" },
-    { SJP_OK, SJP_NUMBER, "", 1, 1 },
+    { SJP_OK, SJP_NUMBER, "", SJP_TEST_NUMBER, 1 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1.1" },
-    { SJP_OK, SJP_NUMBER, "", 1, 1.1 },
+    { SJP_OK, SJP_NUMBER, "", SJP_TEST_NUMBER, 1.1 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_MORE, SJP_NUMBER, "1.35e-2" },
-    { SJP_OK, SJP_NUMBER, "", 1, 1.35e-2 },
+    { SJP_OK, SJP_NUMBER, "", SJP_TEST_NUMBER, 1.35e-2 },
     { SJP_OK, SJP_NONE, "" },
 
     { SJP_OK, SJP_TRUE, "true" },
@@ -306,7 +311,7 @@ void test_simple_arrays(void)
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_STRING, "foo" },
     { SJP_OK, SJP_STRING, "bar" },
-    { SJP_OK, SJP_NUMBER, "2378", 1, 2378 },
+    { SJP_OK, SJP_NUMBER, "2378", SJP_TEST_NUMBER, 2378 },
     { SJP_OK, SJP_ARRAY_END, "]" },
 
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
