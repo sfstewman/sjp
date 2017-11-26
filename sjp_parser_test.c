@@ -133,6 +133,15 @@ static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct
       }
     }
 
+    if (outputs[j].flags & SJP_TEST_NUM_CODEPOINTS) {
+      assert(evt.type == SJP_STRING);
+      if (evt.extra.ncp != outputs[j].ncp) {
+        printf("i=%d, j=%d, expected number %zu but found %zu\n",
+            i,j, outputs[j].ncp, evt.extra.ncp);
+        return -1;
+      }
+    }
+
     more = (ret == SJP_MORE) || close || eos;
     j++;
   }
@@ -147,7 +156,8 @@ static int parser_test_inputs(struct sjp_parser *p, const char *inputs[], struct
   return 0;
 }
 
-void run_parser_test(const char *name, size_t nstack, size_t nbuf, const char *inputs[], struct parser_output outputs[])
+static void run_parser_test(const char *name, size_t nstack,
+    size_t nbuf, const char *inputs[], struct parser_output outputs[])
 {
   int ret;
   struct sjp_parser p = { 0 };
@@ -187,7 +197,7 @@ cleanup:
   free(buf);
 }
 
-void test_values(void)
+static void test_values(void)
 {
   const char *inputs[] = {
     "\"foo bar baz\"",
@@ -214,11 +224,17 @@ void test_values(void)
     "null",
     testing_close_marker,
 
+    "\"string with utf8: \xc3\xbe\xc2\xa2\xe0\xbc\xb2\"", // three codepoints in utf8
+    testing_close_marker,
+
+    "\"shrug: \xc2\xaf\\\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf\"", // emoji shrug is nine codepoints
+    testing_close_marker,
+
     NULL
   };
 
   struct parser_output outputs[] = {
-    { SJP_OK, SJP_STRING, "foo bar baz" },
+    { SJP_OK, SJP_STRING, "foo bar baz", SJP_TEST_NUM_CODEPOINTS, 0.0, 11 },
     { SJP_MORE, SJP_NONE, "" },
     { SJP_OK, SJP_NONE, "" },
 
@@ -246,18 +262,34 @@ void test_values(void)
     { SJP_MORE, SJP_NONE, "" },
     { SJP_OK, SJP_NONE, "" },
 
+    { SJP_OK, SJP_STRING,
+      "string with utf8: \xc3\xbe\xc2\xa2\xe0\xbc\xb2",
+      // escaped \x stuff contains three codepoints in utf8
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 21 },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
+    { SJP_OK, SJP_STRING,
+      "shrug: \xc2\xaf\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf",
+      // emoji shrug is nine codepoints
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 16 },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_NONE, "" },
+
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
 
   run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
-void test_simple_objects(void)
+static void test_simple_objects(void)
 {
   const char *inputs[] = {
     "{}",
     "{ \"foo\" : \"bar\" }",
     "{ \"foo\" : \"bar\", \"baz\" : 2378 }",
+    "{ \"shrug\" : \"\xc2\xaf\\\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf\", ",
+    "\"\xc2\xaf\\\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf\" : \"shrug\" }",
     NULL
   };
 
@@ -268,18 +300,32 @@ void test_simple_objects(void)
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "foo" },
-    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_STRING, "bar", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_OBJECT_END, "}" },
 
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "foo" },
-    { SJP_OK, SJP_STRING, "bar" },
-    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_STRING, "bar", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_STRING, "baz", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_NUMBER, "2378" },
     { SJP_OK, SJP_OBJECT_END, "}" },
+
+    { SJP_MORE, SJP_NONE, "" },
+
+    { SJP_OK, SJP_OBJECT_BEG, "{" },
+    { SJP_OK, SJP_STRING, "shrug", SJP_TEST_NUM_CODEPOINTS, 0.0, 5 },
+    { SJP_OK, SJP_STRING, "\xc2\xaf\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf",
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 9 },
+    { SJP_MORE, SJP_NONE, "" },
+    { SJP_OK, SJP_STRING, "\xc2\xaf\\\x5f\x28\xe3\x83\x84\x29\x5f\x2f\xc2\xaf",
+      SJP_TEST_NUM_CODEPOINTS, 0.0, 9 },
+    { SJP_OK, SJP_STRING, "shrug", SJP_TEST_NUM_CODEPOINTS, 0.0, 5 },
+    { SJP_OK, SJP_OBJECT_END, "}" },
+
+    { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_NONE, NULL }, // end sentinel
   };
@@ -287,7 +333,7 @@ void test_simple_objects(void)
   run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
-void test_simple_arrays(void)
+static void test_simple_arrays(void)
 {
   const char *inputs[] = {
     "[]",
@@ -303,14 +349,14 @@ void test_simple_arrays(void)
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_ARRAY_BEG, "[" },
-    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_ARRAY_END, "]" },
 
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_ARRAY_BEG, "[" },
-    { SJP_OK, SJP_STRING, "foo" },
-    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_STRING, "bar", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_NUMBER, "2378", SJP_TEST_NUMBER, 2378 },
     { SJP_OK, SJP_ARRAY_END, "]" },
 
@@ -320,7 +366,7 @@ void test_simple_arrays(void)
   run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
-void test_nested_arrays_and_objects(void)
+static void test_nested_arrays_and_objects(void)
 {
   const char *inputs[] = {
     "[ {}, [], [ {} ] ]",
@@ -349,10 +395,10 @@ void test_nested_arrays_and_objects(void)
     { SJP_OK, SJP_ARRAY_BEG, "[" },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "foo" },
-    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_STRING, "bar", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
 
-    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_STRING, "baz", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_NUMBER, "123" },
     { SJP_OK, SJP_NUMBER, "456" },
@@ -365,18 +411,18 @@ void test_nested_arrays_and_objects(void)
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "foo" },
+    { SJP_OK, SJP_STRING, "foo", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "bar" },
+    { SJP_OK, SJP_STRING, "bar", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_ARRAY_BEG, "[" },
     { SJP_OK, SJP_NUMBER, "123" },
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_OK, SJP_STRING, "baz" },
+    { SJP_OK, SJP_STRING, "baz", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
     { SJP_OK, SJP_TRUE, "true" },
     { SJP_OK, SJP_OBJECT_END, "}" },
     { SJP_OK, SJP_ARRAY_END, "]" },
 
-    { SJP_OK, SJP_STRING, "quux" },
+    { SJP_OK, SJP_STRING, "quux", SJP_TEST_NUM_CODEPOINTS, 0.0, 4 },
     { SJP_OK, SJP_NUMBER, "-23.56e+5" },
     { SJP_OK, SJP_OBJECT_END, "}" },
 
@@ -390,7 +436,7 @@ void test_nested_arrays_and_objects(void)
   run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
-void test_restarts_1(void)
+static void test_restarts_1(void)
 {
   const char *inputs[] = {
     "[",
@@ -399,7 +445,8 @@ void test_restarts_1(void)
     "{ \"some key that ",
     "we break\" : \"some other string that we",
     " break\", \"short key\" : 12345",
-    ".6789 }",
+    ".6789, \"\xc3\xbe\xc2", // break the utf-8 codepoint
+    "\xa2\xe0\xbc\xb2\" : 5 }",
 
     // "{ \"foo\" : { \"bar\" : [ 123, { \"baz\" : true } ], \"quux\": -23.56e+5 } }",
     NULL
@@ -418,15 +465,19 @@ void test_restarts_1(void)
 
 
     { SJP_OK, SJP_OBJECT_BEG, "{" },
-    { SJP_MORE, SJP_STRING, "some key that " },
-    { SJP_OK, SJP_STRING, "we break" },
+    { SJP_MORE, SJP_STRING, "some key that ", SJP_TEST_NUM_CODEPOINTS, 0.0, 0 },
+    { SJP_OK, SJP_STRING, "we break", SJP_TEST_NUM_CODEPOINTS, 0.0, 22 },
 
-    { SJP_MORE, SJP_STRING, "some other string that we" },
-    { SJP_OK, SJP_STRING, " break" },
+    { SJP_MORE, SJP_STRING, "some other string that we"},
+    { SJP_OK, SJP_STRING, " break", SJP_TEST_NUM_CODEPOINTS, 0.0, 31 },
 
-    { SJP_OK, SJP_STRING, "short key" },
+    { SJP_OK, SJP_STRING, "short key", SJP_TEST_NUM_CODEPOINTS, 0.0, 9 },
     { SJP_MORE, SJP_NUMBER, "12345" },
     { SJP_OK, SJP_NUMBER, ".6789" },
+
+    { SJP_MORE, SJP_STRING, "\xc3\xbe\xc2", SJP_TEST_NUM_CODEPOINTS, 0.0, 0 },
+    { SJP_OK,   SJP_STRING, "\xa2\xe0\xbc\xb2", SJP_TEST_NUM_CODEPOINTS, 0.0, 3 },
+    { SJP_OK, SJP_NUMBER, "5", SJP_TEST_NUMBER, 5.0 },
 
     { SJP_OK, SJP_OBJECT_END, "}" },
 
@@ -437,7 +488,7 @@ void test_restarts_1(void)
   run_parser_test(__func__, DEFAULT_STACK, NO_BUF, inputs, outputs);
 }
 
-void test_buffered_1(void)
+static void test_buffered_1(void)
 {
   const char *inputs[] = {
     "{ \"some key that ",
@@ -453,13 +504,13 @@ void test_buffered_1(void)
     { SJP_OK, SJP_OBJECT_BEG, "{" },
     { SJP_MORE, SJP_NONE, "" },
 
-    { SJP_OK, SJP_STRING, "some key that we break" },
+    { SJP_OK, SJP_STRING, "some key that we break", SJP_TEST_NUM_CODEPOINTS, 0.0, 22 },
 
     { SJP_MORE, SJP_NONE, "" },
 
-    { SJP_OK, SJP_STRING, "some other string that we break" },
+    { SJP_OK, SJP_STRING, "some other string that we break", SJP_TEST_NUM_CODEPOINTS, 0.0, 31 },
 
-    { SJP_OK, SJP_STRING, "short key" },
+    { SJP_OK, SJP_STRING, "short key", SJP_TEST_NUM_CODEPOINTS, 0.0, 9 },
     { SJP_MORE, SJP_NONE, "" },
 
     { SJP_OK, SJP_NUMBER, "12345.6789" },
@@ -473,7 +524,7 @@ void test_buffered_1(void)
   run_parser_test(__func__, DEFAULT_STACK, SMALL_BUF, inputs, outputs);
 }
 
-void test_detect_unclosed_things(void)
+static void test_detect_unclosed_things(void)
 {
   const char *inputs[] = {
     // make sure we return the lexer errors

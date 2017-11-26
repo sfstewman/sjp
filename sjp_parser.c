@@ -100,7 +100,12 @@ static int parse_value(struct sjp_parser *p, struct sjp_event *evt, int ret, str
     case SJP_TOK_NULL:   evt->type = SJP_NULL;   break;
     case SJP_TOK_TRUE:   evt->type = SJP_TRUE;   break;
     case SJP_TOK_FALSE:  evt->type = SJP_FALSE;  break;
-    case SJP_TOK_STRING: evt->type = SJP_STRING; break;
+
+    case SJP_TOK_STRING:
+      evt->type = SJP_STRING;
+      evt->extra.ncp = tok->extra.ncp;
+      break;
+
     case SJP_TOK_NUMBER:
       evt->type = SJP_NUMBER;
       evt->extra.d = tok->extra.dbl;
@@ -304,7 +309,10 @@ restart:
   evt->n = tok.n;
   if (evt->type == SJP_TOK_NUMBER) {
     evt->extra.d = tok.extra.dbl;
+  } else if (evt->type == SJP_TOK_STRING) {
+    evt->extra.ncp = tok.extra.ncp;
   }
+
 
   switch (st) {
     case SJP_PARSER_VALUE:
@@ -330,6 +338,7 @@ restart:
 
         case SJP_TOK_STRING:
           evt->type = SJP_STRING;
+          evt->extra.ncp = tok.extra.ncp;
           break;
 
         case SJP_TOK_NUMBER:
@@ -354,6 +363,7 @@ restart:
 
         case SJP_TOK_STRING:
           evt->type = SJP_STRING;
+          evt->extra.ncp = tok.extra.ncp;
           jp_setstate(p, SJP_PARSER_OBJ_KEY);
           if (ret != SJP_OK) {
             PUSHSTATE(p,SJP_PARSER_PARTIAL);
@@ -398,6 +408,7 @@ restart:
       }
 
       evt->type = SJP_STRING;
+      evt->extra.ncp = tok.extra.ncp;
       jp_setstate(p, SJP_PARSER_OBJ_KEY);
       if (ret != SJP_OK) {
         PUSHSTATE(p, SJP_PARSER_PARTIAL);
